@@ -65,14 +65,12 @@
     padding: 0 16px; height: 48px;
     font-size: 13px; font-weight: 500;
     color: rgba(255,255,255,0.5);
-    cursor: pointer !important;
+    text-decoration: none;
     border-bottom: 3px solid transparent;
     transition: all 0.15s;
     white-space: nowrap;
     user-select: none;
-    position: relative;
-    z-index: 201;
-    pointer-events: all !important;
+    cursor: pointer;
   }
   .nav-tab:hover { color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.05); }
   .nav-tab.active { color: var(--white); border-bottom-color: var(--teal); font-weight: 600; }
@@ -375,10 +373,10 @@
     <div class="topbar-title">Port Store · <span>Incoming Orders</span></div>
   </div>
   <div class="nav-tabs">
-    <div class="nav-tab active" data-tab="orders">📦 Orders</div>
-    <div class="nav-tab" data-tab="calendar">📅 Calendar</div>
-    <div class="nav-tab" data-tab="lightspeed">🖥️ Lightspeed</div>
-    <div class="nav-tab" data-tab="awds">📤 AWDS</div>
+    <a class="nav-tab active" data-tab="orders" href="#orders">📦 Orders</a>
+    <a class="nav-tab" data-tab="calendar" href="#calendar">📅 Calendar</a>
+    <a class="nav-tab" data-tab="lightspeed" href="#lightspeed">🖥️ Lightspeed</a>
+    <a class="nav-tab" data-tab="awds" href="#awds">📤 AWDS</a>
   </div>
   <a href="https://pafc-team.monday.com/boards/18413119094" target="_blank" class="monday-link">☰ board ↗</a>
 </div>
@@ -648,7 +646,7 @@ async function initMonday() {
 }
 
 async function mondayQuery(query) {
-  // Try SDK first (works if installed as a proper monday developer app)
+  // Try SDK first (works as a proper monday developer app)
   if (mondayClient) {
     try {
       const res = await mondayClient.api(query);
@@ -658,21 +656,26 @@ async function mondayQuery(query) {
       // SDK failed — fall through to token
     }
   }
-  // HTML Embedded widget / direct browser — use hardcoded or stored token
+  // Use hardcoded token, then localStorage, then prompt once
   const token = (HARDCODED_TOKEN && HARDCODED_TOKEN !== 'PASTE_YOUR_TOKEN_HERE')
     ? HARDCODED_TOKEN
     : (localStorage.getItem('mon_token') || '');
   if (!token) {
-    const t = prompt('Enter your monday API token:\n(Avatar → Developers → API v2 Token)');
-    if (!t) throw new Error('No API token provided.');
-    localStorage.setItem('mon_token', t);
+    const t = prompt('Enter your monday API token to connect:\n\nAvatar (top right) → Developers → API v2 Token → Copy');
+    if (!t) throw new Error('No API token — enter your token to connect.');
+    localStorage.setItem('mon_token', t.trim());
     return mondayQuery(query);
   }
   const res = await fetch('https://api.monday.com/v2', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': token, 'API-Version': '2024-01' },
+    headers: { 'Content-Type': 'application/json', 'Authorization': token.trim(), 'API-Version': '2024-01' },
     body: JSON.stringify({ query })
   });
+  if (!res.ok) {
+    // Token might be wrong — clear it and retry
+    localStorage.removeItem('mon_token');
+    throw new Error(`API error ${res.status} — check your token is correct.`);
+  }
   const json = await res.json();
   if (json.errors) throw new Error(json.errors[0].message);
   return json.data;
@@ -982,26 +985,25 @@ function showToast(msg,type='success') {
   const t=document.getElementById('toast'); document.getElementById('toast-msg').textContent=msg; t.className=`toast ${type}`; void t.offsetWidth; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000);
 }
 
-function initTabs() {
-  document.querySelectorAll('.nav-tab').forEach(tab => {
-    ['mousedown','touchstart','click','pointerdown'].forEach(evt => {
-      tab.addEventListener(evt, function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        const target = this.dataset.tab;
-        document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === target));
-        document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'tab-' + target));
-        if (target === 'calendar') renderCalendar();
-      }, { capture: true, passive: false });
-    });
-  });
+// ─── HASH-BASED TAB ROUTING ───────────────────────────────
+// Uses URL hash (#orders, #calendar etc) — works in all iFrame contexts
+// because hash changes are native browser navigation, not JS events
+function switchTab(tab) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'tab-' + tab));
+  if (tab === 'calendar') renderCalendar();
 }
 
-// Init tabs immediately — don't wait for API
-document.addEventListener('DOMContentLoaded', () => { initTabs(); });
+function handleHash() {
+  const hash = window.location.hash.replace('#','') || 'orders';
+  const valid = ['orders','calendar','lightspeed','awds'];
+  switchTab(valid.includes(hash) ? hash : 'orders');
+}
 
-// Load data after SDK ready
+window.addEventListener('hashchange', handleHash);
+window.addEventListener('load', handleHash);
+
+// ─── STARTUP ─────────────────────────────────────────────
 initMonday().then(() => loadOrders());
 </script>
 </body>
