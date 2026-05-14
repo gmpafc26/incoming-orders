@@ -165,11 +165,19 @@
   .row-label { font-size: 10px; font-weight: 700; color: var(--grey-400); text-transform: uppercase; letter-spacing: 0.07em; flex-shrink: 0; width: 90px; }
   .row-value { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: flex-end; min-width: 0; }
 
-  /* File pills — available (clickable) vs unavailable (greyed) */
+  /* File pills — available (clickable) vs to be completed (orange) */
   .file-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; text-decoration: none; transition: all 0.15s; flex-shrink: 0; }
   .file-pill.available { background: var(--teal-light); color: var(--teal-dark); border: 1px solid rgba(0,180,200,0.3); cursor: pointer; }
   .file-pill.available:hover { background: var(--teal); color: var(--white); }
-  .file-pill.unavailable { background: var(--grey-100); color: var(--grey-400); border: 1px solid var(--grey-200); cursor: default; }
+  .file-pill.tbc { background: var(--status-pending-bg); color: var(--status-pending); border: 1px solid rgba(245,166,35,0.3); cursor: default; }
+
+  /* Product status pills */
+  .prod-status { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; }
+  .ps-ordered  { background: var(--status-pending-bg); color: var(--status-pending); border: 1px solid rgba(245,166,35,0.3); }
+  .ps-transit  { background: var(--teal-light); color: var(--teal-dark); border: 1px solid rgba(0,180,200,0.3); }
+  .ps-received { background: var(--status-done-bg); color: var(--status-done); border: 1px solid rgba(39,174,96,0.3); }
+
+  .card-footer { padding: 10px 16px 12px; border-top: 1px solid var(--grey-100); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
   .status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; transition: opacity 0.15s; flex-shrink: 0; }
   .status-pill.pending { background: var(--status-pending-bg); color: var(--status-pending); border: 1px solid rgba(245,166,35,0.3); }
@@ -590,7 +598,6 @@
         <div class="form-group"><label class="form-label">Supplier</label><select class="form-select" id="f-supplier"><option value="">Select supplier…</option><option>Macron</option><option>Licensing Essentials</option><option>New Era</option><option>NAR / Mitchell &amp; Ness</option><option>Kookaburra</option><option>Trofe</option><option>Sporting Souvenirs</option></select></div>
         <div class="form-group"><label class="form-label">Arrival Date</label><input type="date" class="form-input" id="f-delivery"></div>
         <div class="form-group full"><label class="form-label">Arrival Status</label><div class="status-select-group" id="f-arrival-status-group"><div class="status-option pending-opt active-pending" data-val="Tentative" onclick="selectArrivalStatus(this)">Tentative</div><div class="status-option done-opt" data-val="Confirmed" onclick="selectArrivalStatus(this)">Confirmed</div></div></div>
-        <div class="form-group full"><label class="form-label">Order Placed — SharePoint Link</label><input type="url" class="form-input" id="f-order-link" placeholder="https://portadelaidefc.sharepoint.com/…"></div>
         <div class="form-section-label">📥 Lightspeed Product Upload</div>
         <div class="form-group full"><label class="form-label">Lightspeed File — SharePoint Link</label><input type="url" class="form-input" id="f-ls-link" placeholder="https://portadelaidefc.sharepoint.com/…"></div>
         <div class="form-group full"><label class="form-label">Lightspeed Status</label><div class="status-select-group" id="f-ls-status-group"><div class="status-option pending-opt active-pending" data-val="To Be Completed" onclick="selectStatus('ls', this)">To Be Completed</div><div class="status-option ready-opt" data-val="File Ready" onclick="selectStatus('ls', this)">File Ready</div><div class="status-option done-opt" data-val="Available in Lightspeed" onclick="selectStatus('ls', this)">Available in Lightspeed</div></div></div>
@@ -600,6 +607,8 @@
         <div class="form-section-label">🖼️ Assets & Information</div>
         <div class="form-group"><label class="form-label">Imagery — SharePoint Link</label><input type="url" class="form-input" id="f-imagery-link" placeholder="https://portadelaidefc.sharepoint.com/…"></div>
         <div class="form-group"><label class="form-label">Product Info — SharePoint Link</label><input type="url" class="form-input" id="f-info-link" placeholder="https://portadelaidefc.sharepoint.com/…"></div>
+        <div class="form-section-label">📦 Product Status</div>
+        <div class="form-group full"><div class="status-select-group" id="f-product-status-group"><div class="status-option pending-opt active-pending" data-val="Ordered" onclick="selectProductStatus(this)">Ordered</div><div class="status-option ready-opt" data-val="In Transit" onclick="selectProductStatus(this)">In Transit</div><div class="status-option done-opt" data-val="Received" onclick="selectProductStatus(this)">Received</div></div></div>
         <div class="form-group full"><label class="form-label">Notes</label><textarea class="form-textarea" id="f-notes" placeholder="Any additional notes, context, or reminders…"></textarea></div>
       </div>
     </div>
@@ -612,7 +621,7 @@
 <script>
 const BOARD_ID = '18413119094';
 const COL = { supplier:'dropdown_mm3b6cg4', delivery:'text_mm3bwgf1', orderLink:'link_mm3bzy9j', lsFile:'link_mm3bzf16', lsStatus:'color_mm3by7z', awdsFile:'link_mm3by0r3', awdsStatus:'color_mm3b2wh8', imagery:'link_mm3b9662', productInfo:'link_mm3bqe76', notes:'long_text_mm3bf7qw' };
-let allOrders = [], editingItemId = null, lsStatusVal = 'To Be Completed', awdsStatusVal = 'To Be Completed', arrivalStatusVal = 'Tentative';
+let allOrders = [], editingItemId = null, lsStatusVal = 'To Be Completed', awdsStatusVal = 'To Be Completed', arrivalStatusVal = 'Tentative', productStatusVal = 'Ordered';
 let calYear = new Date().getFullYear(), calMonth = new Date().getMonth();
 
 const SUPPLIER_MAP = {
@@ -682,11 +691,19 @@ async function loadOrders() {
 }
 
 function extractArrivalStatus(notes) {
-  if ((notes||'').startsWith('[Confirmed]')) return 'Confirmed';
+  if ((notes||'').includes('[Confirmed]')) return 'Confirmed';
   return 'Tentative';
 }
-function cleanNotes(notes) { return (notes||'').replace(/^\[(Confirmed|Tentative)\]\s*/, ''); }
-function packNotes(status, notes) { return notes ? `[${status}] ${notes}` : `[${status}]`; }
+function extractProductStatus(notes) {
+  const m = (notes||'').match(/\[PS:(.*?)\]/);
+  return m ? m[1] : 'Ordered';
+}
+function cleanNotes(notes) {
+  return (notes||'').replace(/\[(Confirmed|Tentative)\]/g,'').replace(/\[PS:[^\]]*\]/g,'').trim();
+}
+function packNotes(arrivalStatus, productStatus, notes) {
+  return `[${arrivalStatus}][PS:${productStatus}]${notes ? ' ' + notes : ''}`;
+}
 function parseDate(str) {
   if (!str) return null;
   const m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -709,17 +726,27 @@ function parseItem(item) {
     awdsStatus:getStatus(COL.awdsStatus), imagery:getLink(COL.imagery),
     productInfo:getLink(COL.productInfo),
     arrivalStatus:extractArrivalStatus(rawNotes),
+    productStatus:extractProductStatus(rawNotes),
     cleanNotes:cleanNotes(rawNotes),
   };
 }
 
 function supplierInfo(name) { return SUPPLIER_MAP[name] || { cls:'other', label:name||'Unknown' }; }
 function statusClass(v) { if(!v||v==='To Be Completed') return 'pending'; if(v==='File Ready') return 'ready'; return 'done'; }
+
+// Available = teal clickable button, not available = orange "To Be Completed" pill
 function filePill(linkObj, label) {
   return linkObj.url
-    ? `<a href="${linkObj.url}" target="_blank" class="file-pill available">✓ ${label}</a>`
-    : `<span class="file-pill unavailable">✕ ${label}</span>`;
+    ? `<a href="${linkObj.url}" target="_blank" class="file-pill available">↗ ${label}</a>`
+    : `<span class="file-pill tbc">To Be Completed</span>`;
 }
+
+function prodStatusPill(val) {
+  if (val === 'In Transit') return `<span class="prod-status ps-transit">🚚 In Transit</span>`;
+  if (val === 'Received')   return `<span class="prod-status ps-received">✓ Received</span>`;
+  return `<span class="prod-status ps-ordered">📋 Ordered</span>`;
+}
+
 function formatDate(d) {
   return d ? d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : null;
 }
@@ -731,7 +758,14 @@ function renderOrders(orders) {
     grid.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">No orders found</div><p class="empty-sub">Add your first incoming order or adjust your filters.</p><button class="btn-new" onclick="openNewModal()" style="display:inline-flex;margin:0 auto;">+ New Order</button></div>`;
     return;
   }
-  grid.innerHTML = orders.map(o => {
+  // Sort: orders with dates first (soonest → latest), no-date orders at end
+  const sorted = [...orders].sort((a, b) => {
+    if (a.deliveryDate && b.deliveryDate) return a.deliveryDate - b.deliveryDate;
+    if (a.deliveryDate) return -1;
+    if (b.deliveryDate) return 1;
+    return 0;
+  });
+  grid.innerHTML = sorted.map(o => {
     const si = supplierInfo(o.supplier);
     const dateStr = formatDate(o.deliveryDate);
     const arrCls = o.arrivalStatus==='Confirmed' ? 'confirmed' : o.deliveryDate ? 'tentative' : 'nodate';
@@ -749,11 +783,14 @@ function renderOrders(orders) {
         <div class="card-actions"><button class="btn-icon" onclick="openEditModal('${o.id}')">✎</button></div>
       </div>
       <div class="card-body">
-        <div class="card-row"><span class="row-label">Order Placed</span><span class="row-value">${filePill(o.orderLink,'Order')}</span></div>
-        <div class="card-row"><span class="row-label">Lightspeed</span><span class="row-value">${filePill(o.lsFile,'LS File')}<span class="status-pill ${statusClass(o.lsStatus)}"><span class="status-dot"></span>${o.lsStatus||'To Be Completed'}</span></span></div>
-        <div class="card-row"><span class="row-label">AWDS</span><span class="row-value">${filePill(o.awdsFile,'AWDS File')}<span class="status-pill ${statusClass(o.awdsStatus)}"><span class="status-dot"></span>${o.awdsStatus||'To Be Completed'}</span></span></div>
-        <div class="card-row"><span class="row-label">Imagery</span><span class="row-value">${filePill(o.imagery,'Images')}</span></div>
-        <div class="card-row"><span class="row-label">Product Info</span><span class="row-value">${filePill(o.productInfo,'Info')}</span></div>
+        <div class="card-row"><span class="row-label">Lightspeed</span><span class="row-value">${o.lsFile.url ? filePill(o.lsFile,'Lightspeed File') : `<span class="file-pill tbc">To Be Completed</span>`}</span></div>
+        <div class="card-row"><span class="row-label">AWDS</span><span class="row-value">${o.awdsFile.url ? filePill(o.awdsFile,'AWDS File') : `<span class="file-pill tbc">To Be Completed</span>`}</span></div>
+        <div class="card-row"><span class="row-label">Imagery</span><span class="row-value">${o.imagery.url ? filePill(o.imagery,'Imagery') : `<span class="file-pill tbc">To Be Completed</span>`}</span></div>
+        <div class="card-row"><span class="row-label">Product Info</span><span class="row-value">${o.productInfo.url ? filePill(o.productInfo,'Product Info') : `<span class="file-pill tbc">To Be Completed</span>`}</span></div>
+      </div>
+      <div class="card-footer">
+        <span style="font-size:10px;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:0.07em;">Product Status</span>
+        ${prodStatusPill(o.productStatus)}
       </div>
       ${o.cleanNotes?`<div class="card-notes"><p class="notes-text">📝 ${o.cleanNotes}</p></div>`:''}
     </div>`;
@@ -826,16 +863,31 @@ function selectStatus(type, el) {
   el.classList.add(el.dataset.val==='To Be Completed'?'active-pending':el.dataset.val==='File Ready'?'active-ready':'active-done');
   if(type==='ls') lsStatusVal=el.dataset.val; else awdsStatusVal=el.dataset.val;
 }
-function selectArrivalStatus(el) {
+function selectProductStatus(el) {
+  document.getElementById('f-product-status-group').querySelectorAll('.status-option').forEach(o=>{o.className=o.className.replace(/active-\w+/g,'').trim();});
+  const v=el.dataset.val;
+  el.classList.add(v==='Received'?'active-done':v==='In Transit'?'active-ready':'active-pending');
+  productStatusVal=v;
+}
+function setProductStatus(val) {
+  productStatusVal=val||'Ordered';
+  const g=document.getElementById('f-product-status-group');
+  if(g) g.querySelectorAll('.status-option').forEach(opt=>{
+    opt.className=opt.className.replace(/active-\w+/g,'').trim();
+    if(opt.dataset.val===productStatusVal) opt.classList.add(productStatusVal==='Received'?'active-done':productStatusVal==='In Transit'?'active-ready':'active-pending');
+  });
+}
   document.getElementById('f-arrival-status-group').querySelectorAll('.status-option').forEach(o=>{o.className=o.className.replace(/active-\w+/g,'').trim();});
   el.classList.add(el.dataset.val==='Confirmed'?'active-done':'active-pending');
   arrivalStatusVal=el.dataset.val;
 }
 function resetStatusSelectors() {
-  lsStatusVal='To Be Completed'; awdsStatusVal='To Be Completed'; arrivalStatusVal='Tentative';
+  lsStatusVal='To Be Completed'; awdsStatusVal='To Be Completed'; arrivalStatusVal='Tentative'; productStatusVal='Ordered';
   ['f-ls-status-group','f-awds-status-group'].forEach(gid=>{document.getElementById(gid).querySelectorAll('.status-option').forEach((o,i)=>{o.className=o.className.replace(/active-\w+/g,'').trim();if(i===0)o.classList.add('active-pending');});});
   const ag=document.getElementById('f-arrival-status-group');
   if(ag) ag.querySelectorAll('.status-option').forEach((o,i)=>{o.className=o.className.replace(/active-\w+/g,'').trim();if(i===0)o.classList.add('active-pending');});
+  const pg=document.getElementById('f-product-status-group');
+  if(pg) pg.querySelectorAll('.status-option').forEach((o,i)=>{o.className=o.className.replace(/active-\w+/g,'').trim();if(i===0)o.classList.add('active-pending');});
 }
 function setStatusSelector(type,val) {
   const gid=type==='ls'?'f-ls-status-group':'f-awds-status-group';
@@ -851,7 +903,7 @@ function setArrivalStatus(val) {
 // ─── MODAL ────────────────────────────────────────────────
 function openNewModal() {
   editingItemId=null; document.getElementById('modal-title').textContent='New Incoming Order'; document.getElementById('save-label').textContent='Save Order';
-  ['f-name','f-supplier','f-delivery','f-order-link','f-ls-link','f-awds-link','f-imagery-link','f-info-link','f-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['f-name','f-supplier','f-delivery','f-ls-link','f-awds-link','f-imagery-link','f-info-link','f-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   resetStatusSelectors(); document.getElementById('modal-overlay').classList.add('open');
 }
 function openEditModal(id) {
@@ -860,7 +912,6 @@ function openEditModal(id) {
   document.getElementById('f-name').value=o.name||'';
   document.getElementById('f-supplier').value=o.supplier||'';
   document.getElementById('f-delivery').value=o.deliveryDate?o.deliveryDate.toISOString().split('T')[0]:(o.delivery||'');
-  document.getElementById('f-order-link').value=o.orderLink.url||'';
   document.getElementById('f-ls-link').value=o.lsFile.url||'';
   document.getElementById('f-awds-link').value=o.awdsFile.url||'';
   document.getElementById('f-imagery-link').value=o.imagery.url||'';
@@ -869,6 +920,7 @@ function openEditModal(id) {
   setStatusSelector('ls',o.lsStatus||'To Be Completed');
   setStatusSelector('awds',o.awdsStatus||'To Be Completed');
   setArrivalStatus(o.arrivalStatus||'Tentative');
+  setProductStatus(o.productStatus||'Ordered');
   document.getElementById('modal-overlay').classList.add('open');
 }
 function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
@@ -878,18 +930,20 @@ async function saveOrder() {
   const name=document.getElementById('f-name').value.trim(); if(!name){showToast('Order name is required.','error');return;}
   const btn=document.getElementById('btn-save'); btn.disabled=true; document.getElementById('save-label').textContent='Saving…';
   const cv={};
-  const s=document.getElementById('f-supplier').value, d=document.getElementById('f-delivery').value.trim(),
-        ol=document.getElementById('f-order-link').value.trim(), ll=document.getElementById('f-ls-link').value.trim(),
-        al=document.getElementById('f-awds-link').value.trim(), il=document.getElementById('f-imagery-link').value.trim(),
-        pl=document.getElementById('f-info-link').value.trim(), n=document.getElementById('f-notes').value.trim();
+  const s=document.getElementById('f-supplier').value,
+        d=document.getElementById('f-delivery').value.trim(),
+        ll=document.getElementById('f-ls-link').value.trim(),
+        al=document.getElementById('f-awds-link').value.trim(),
+        il=document.getElementById('f-imagery-link').value.trim(),
+        pl=document.getElementById('f-info-link').value.trim(),
+        n=document.getElementById('f-notes').value.trim();
   if(s) cv[COL.supplier]={labels:[s]};
   if(d) cv[COL.delivery]=d;
-  if(ol) cv[COL.orderLink]={url:ol,text:'View Order'};
   if(ll) cv[COL.lsFile]={url:ll,text:'Lightspeed File'};
   if(al) cv[COL.awdsFile]={url:al,text:'AWDS File'};
   if(il) cv[COL.imagery]={url:il,text:'View Imagery'};
   if(pl) cv[COL.productInfo]={url:pl,text:'Product Info'};
-  cv[COL.notes]=packNotes(arrivalStatusVal,n);
+  cv[COL.notes]=packNotes(arrivalStatusVal,productStatusVal,n);
   cv[COL.lsStatus]={label:lsStatusVal};
   cv[COL.awdsStatus]={label:awdsStatusVal};
   const cvStr=JSON.stringify(cv);
