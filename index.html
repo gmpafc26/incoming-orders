@@ -992,30 +992,49 @@ function closeModalOnBackdrop(e) { if(e.target===document.getElementById('modal-
 async function saveOrder() {
   const name=document.getElementById('f-name').value.trim(); if(!name){showToast('Order name is required.','error');return;}
   const btn=document.getElementById('btn-save'); btn.disabled=true; document.getElementById('save-label').textContent='Saving…';
-  const cv={};
-  const s=document.getElementById('f-supplier').value,
-        d=document.getElementById('f-delivery').value.trim(),
-        ll=document.getElementById('f-ls-link').value.trim(),
-        al=document.getElementById('f-awds-link').value.trim(),
-        il=document.getElementById('f-imagery-link').value.trim(),
-        pl=document.getElementById('f-info-link').value.trim(),
-        n=document.getElementById('f-notes').value.trim();
-  if(s) cv[COL.supplier]={labels:[s]};
-  if(d) cv[COL.delivery]=d;
-  if(ll) cv[COL.lsFile]={url:ll,text:'Lightspeed File'};
-  if(al) cv[COL.awdsFile]={url:al,text:'AWDS File'};
-  if(il) cv[COL.imagery]={url:il,text:'View Imagery'};
-  if(pl) cv[COL.productInfo]={url:pl,text:'Product Info'};
-  cv[COL.notes]=packNotes(arrivalStatusVal,productStatusVal,n);
-  cv[COL.lsStatus]={label:lsStatusVal};
-  cv[COL.awdsStatus]={label:awdsStatusVal};
-  const cvStr=JSON.stringify(cv);
+
+  const s  = document.getElementById('f-supplier').value;
+  const d  = document.getElementById('f-delivery').value.trim();
+  const ll = document.getElementById('f-ls-link').value.trim();
+  const al = document.getElementById('f-awds-link').value.trim();
+  const il = document.getElementById('f-imagery-link').value.trim();
+  const pl = document.getElementById('f-info-link').value.trim();
+  const n  = document.getElementById('f-notes').value.trim();
+
+  // Always write every field — empty string clears the value in monday
+  const cv = {};
+  cv[COL.supplier]    = s  ? { labels: [s] }               : { labels: [] };
+  cv[COL.delivery]    = d  || '';
+  cv[COL.lsFile]      = ll ? { url: ll, text: 'Lightspeed File' } : { url: '', text: '' };
+  cv[COL.awdsFile]    = al ? { url: al, text: 'AWDS File' }       : { url: '', text: '' };
+  cv[COL.imagery]     = il ? { url: il, text: 'View Imagery' }    : { url: '', text: '' };
+  cv[COL.productInfo] = pl ? { url: pl, text: 'Product Info' }    : { url: '', text: '' };
+  cv[COL.notes]       = packNotes(arrivalStatusVal, productStatusVal, n);
+  cv[COL.lsStatus]    = { label: lsStatusVal };
+  cv[COL.awdsStatus]  = { label: awdsStatusVal };
+
+  const cvStr = JSON.stringify(cv);
   try {
-    if(editingItemId){await mondayQuery(`mutation{change_multiple_column_values(board_id:${BOARD_ID},item_id:${editingItemId},column_values:${JSON.stringify(cvStr)},create_labels_if_missing:true){id}}`);showToast('Order updated ✓','success');}
-    else{await mondayQuery(`mutation{create_item(board_id:${BOARD_ID},item_name:${JSON.stringify(name)},column_values:${JSON.stringify(cvStr)},create_labels_if_missing:true){id}}`);showToast('Order saved ✓','success');}
-    closeModal(); await loadOrders();
-  } catch(e){showToast('Error: '+e.message,'error');}
-  finally{btn.disabled=false; document.getElementById('save-label').textContent=editingItemId?'Update Order':'Save Order';}
+    if (editingItemId) {
+      // Update item name if it changed
+      const existing = allOrders.find(x => x.id === editingItemId);
+      if (existing && existing.name !== name) {
+        await mondayQuery(`mutation{change_item_value(board_id:${BOARD_ID},item_id:${editingItemId},column_id:"name",value:${JSON.stringify(JSON.stringify(name))}){id}}`);
+      }
+      await mondayQuery(`mutation{change_multiple_column_values(board_id:${BOARD_ID},item_id:${editingItemId},column_values:${JSON.stringify(cvStr)},create_labels_if_missing:true){id}}`);
+      showToast('Order updated ✓', 'success');
+    } else {
+      await mondayQuery(`mutation{create_item(board_id:${BOARD_ID},item_name:${JSON.stringify(name)},column_values:${JSON.stringify(cvStr)},create_labels_if_missing:true){id}}`);
+      showToast('Order saved ✓', 'success');
+    }
+    closeModal();
+    await loadOrders();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('save-label').textContent = editingItemId ? 'Update Order' : 'Save Order';
+  }
 }
 
 function showToast(msg,type='success') {
