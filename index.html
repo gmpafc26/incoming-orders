@@ -682,7 +682,8 @@ async function loadOrders() {
   const grid = document.getElementById('orders-grid');
   grid.innerHTML = `<div class="loading-state"><div class="spinner"></div><p style="font-size:14px;color:var(--grey-400);">Loading orders…</p></div>`;
   try {
-    const data = await mondayQuery(`query{boards(ids:[${BOARD_ID}]){items_page(limit:200){items{id name column_values{id text value ...on LinkValue{url text}...on StatusValue{label index}...on DropdownValue{values{id label}}...on LongTextValue{text}...on TextValue{text}}}}}}`);
+    // Simplified query — avoid typed fragments which can cause schema errors
+    const data = await mondayQuery(`query{boards(ids:[${BOARD_ID}]){items_page(limit:200){items{id name column_values{id text value}}}}}`);
     allOrders = (data?.boards?.[0]?.items_page?.items || []).map(parseItem);
     applyFilters();
   } catch(e) {
@@ -711,23 +712,45 @@ function parseDate(str) {
 }
 
 function parseItem(item) {
-  const cv = {}; for (const c of item.column_values) cv[c.id] = c;
-  const getLink    = id => { const c=cv[id]; return c?{url:c.url||'',label:c.text||''}:{url:'',label:''}; };
-  const getText    = id => cv[id]?.text||'';
-  const getStatus  = id => cv[id]?.label||cv[id]?.text||'';
-  const getDrop    = id => { const v=cv[id]?.values; return v?.length?v[0].label:''; };
-  const rawNotes   = getText(COL.notes);
-  const rawDel     = getText(COL.delivery);
+  const cv = {};
+  for (const c of item.column_values) cv[c.id] = c;
+
+  const getText = id => cv[id]?.text || '';
+  const getStatus = id => cv[id]?.text || '';
+  const getDrop = id => {
+    // Dropdown values come back as text in simple query
+    return cv[id]?.text || '';
+  };
+  const getLink = id => {
+    // Link columns return JSON in value field: {"url":"...","text":"..."}
+    try {
+      const val = cv[id]?.value;
+      if (val && val !== 'null') {
+        const parsed = JSON.parse(val);
+        return { url: parsed.url || '', label: parsed.text || '' };
+      }
+    } catch(e) {}
+    return { url: '', label: '' };
+  };
+
+  const rawNotes = getText(COL.notes);
+  const rawDel   = getText(COL.delivery);
+
   return {
-    id:item.id, name:item.name, supplier:getDrop(COL.supplier),
-    delivery:rawDel, deliveryDate:parseDate(rawDel),
-    orderLink:getLink(COL.orderLink), lsFile:getLink(COL.lsFile),
-    lsStatus:getStatus(COL.lsStatus), awdsFile:getLink(COL.awdsFile),
-    awdsStatus:getStatus(COL.awdsStatus), imagery:getLink(COL.imagery),
-    productInfo:getLink(COL.productInfo),
-    arrivalStatus:extractArrivalStatus(rawNotes),
-    productStatus:extractProductStatus(rawNotes),
-    cleanNotes:cleanNotes(rawNotes),
+    id: item.id, name: item.name,
+    supplier:     getDrop(COL.supplier),
+    delivery:     rawDel,
+    deliveryDate: parseDate(rawDel),
+    orderLink:    getLink(COL.orderLink),
+    lsFile:       getLink(COL.lsFile),
+    lsStatus:     getStatus(COL.lsStatus),
+    awdsFile:     getLink(COL.awdsFile),
+    awdsStatus:   getStatus(COL.awdsStatus),
+    imagery:      getLink(COL.imagery),
+    productInfo:  getLink(COL.productInfo),
+    arrivalStatus:  extractArrivalStatus(rawNotes),
+    productStatus:  extractProductStatus(rawNotes),
+    cleanNotes:     cleanNotes(rawNotes),
   };
 }
 
@@ -975,7 +998,11 @@ function initTabs() {
   });
 }
 
-initMonday().then(()=>{ loadOrders(); initTabs(); });
+// Init tabs immediately — don't wait for API
+document.addEventListener('DOMContentLoaded', () => { initTabs(); });
+
+// Load data after SDK ready
+initMonday().then(() => loadOrders());
 </script>
 </body>
 </html>
