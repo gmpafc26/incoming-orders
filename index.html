@@ -1016,10 +1016,10 @@ async function saveOrder() {
   const cvStr = JSON.stringify(cv);
   try {
     if (editingItemId) {
-      // Update item name if it changed
+      // Update item name if changed — use change_simple_column_value with column_id "name"
       const existing = allOrders.find(x => x.id === editingItemId);
       if (existing && existing.name !== name) {
-        await mondayQuery(`mutation{change_item_value(board_id:${BOARD_ID},item_id:${editingItemId},column_id:"name",value:${JSON.stringify(JSON.stringify(name))}){id}}`);
+        await mondayQuery(`mutation{change_simple_column_value(board_id:${BOARD_ID},item_id:${editingItemId},column_id:"name",value:${JSON.stringify(name)}){id}}`);
       }
       await mondayQuery(`mutation{change_multiple_column_values(board_id:${BOARD_ID},item_id:${editingItemId},column_values:${JSON.stringify(cvStr)},create_labels_if_missing:true){id}}`);
       showToast('Order updated ✓', 'success');
