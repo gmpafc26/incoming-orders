@@ -614,6 +614,26 @@
   </div>
 </div>
 
+<!-- TOKEN SCREEN -->
+<div id="token-screen" style="display:none;position:fixed;inset:0;background:var(--grey-50);z-index:999;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:white;border-radius:16px;padding:32px;max-width:440px;width:100%;box-shadow:var(--shadow-lg);text-align:center;">
+    <div style="font-size:36px;margin-bottom:16px;">🔑</div>
+    <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px;">Connect to monday.com</div>
+    <div style="font-size:13px;color:var(--grey-400);margin-bottom:24px;line-height:1.6;">
+      Paste your monday API token below.<br>
+      <strong style="color:var(--text);">Avatar → Developers → API v2 Token → Copy</strong>
+    </div>
+    <input id="token-field" type="password" placeholder="eyJhbGciOiJIUzI1NiJ9…"
+      style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:monospace;font-size:13px;margin-bottom:12px;outline:none;box-sizing:border-box;"
+      onkeydown="if(event.key==='Enter')connectToken()">
+    <button onclick="connectToken()"
+      style="width:100%;height:42px;background:var(--teal);color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">
+      Connect ↗
+    </button>
+    <div style="margin-top:12px;font-size:11px;color:var(--grey-400);">Your token is saved in this browser session only.</div>
+  </div>
+</div>
+
 <div class="toast" id="toast"><span class="toast-icon"></span><span id="toast-msg"></span></div>
 
 <script>
@@ -621,6 +641,11 @@ const BOARD_ID = '18413119094';
 const COL = { supplier:'dropdown_mm3b6cg4', delivery:'text_mm3bwgf1', orderLink:'link_mm3bzy9j', lsFile:'link_mm3bzf16', lsStatus:'color_mm3by7z', awdsFile:'link_mm3by0r3', awdsStatus:'color_mm3b2wh8', imagery:'link_mm3b9662', productInfo:'link_mm3bqe76', notes:'long_text_mm3bf7qw' };
 let allOrders = [], editingItemId = null, lsStatusVal = 'To Be Completed', awdsStatusVal = 'To Be Completed', arrivalStatusVal = 'Tentative', productStatusVal = 'Ordered';
 let calYear = new Date().getFullYear(), calMonth = new Date().getMonth();
+
+// ─── PERMANENT TOKEN ──────────────────────────────────────
+// Replace YOUR_TOKEN_HERE with your monday API token
+// Avatar (top right) → Developers → API v2 Token → Copy
+const PERMANENT_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY1NzcwMzM3NSwiYWFpIjoxMSwidWlkIjo4MjY0Njg5NiwiaWFkIjoiMjAyNi0wNS0xM1QwMDo0NjoxMC4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6NzA5Mjc2LCJyZ24iOiJ1c2UxIn0.yD_YwplvFrgMpNEUU-rGQNz6GscMVfTiomF1PW4fB0c';
 
 const SUPPLIER_MAP = {
   'Macron':                { cls:'macron', label:'Macron' },
@@ -635,10 +660,19 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 
 const mondayClient = window.mondaySdk ? window.mondaySdk() : null;
 
-// ─── API TOKEN ────────────────────────────────────────────
-// Paste your monday API token here (Avatar → Developers → API v2 Token)
-// This is required when using the HTML Embedded widget (Collabsoft)
-const HARDCODED_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY1NzcwMzM3NSwiYWFpIjoxMSwidWlkIjo4MjY0Njg5NiwiaWFkIjoiMjAyNi0wNS0xM1QwMDo0NjoxMC4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6NzA5Mjc2LCJyZ24iOiJ1c2UxIn0.yD_YwplvFrgMpNEUU-rGQNz6GscMVfTiomF1PW4fB0c';
+// Token stored in sessionStorage — persists for the browser tab session
+function getToken() {
+  if (PERMANENT_TOKEN && PERMANENT_TOKEN !== 'YOUR_TOKEN_HERE') return PERMANENT_TOKEN;
+  return sessionStorage.getItem('mon_api_token') || localStorage.getItem('mon_api_token') || '';
+}
+function saveToken(t) {
+  sessionStorage.setItem('mon_api_token', t);
+  localStorage.setItem('mon_api_token', t);
+}
+function clearToken() {
+  sessionStorage.removeItem('mon_api_token');
+  localStorage.removeItem('mon_api_token');
+}
 
 async function initMonday() {
   if (!mondayClient) return;
@@ -646,51 +680,53 @@ async function initMonday() {
 }
 
 async function mondayQuery(query) {
-  // Try SDK first (works as a proper monday developer app)
   if (mondayClient) {
     try {
       const res = await mondayClient.api(query);
       if (res.errors && res.errors.length) throw new Error(res.errors[0].message);
       return res.data !== undefined ? res.data : res;
-    } catch(e) {
-      // SDK failed — fall through to token
-    }
+    } catch(e) {}
   }
-  // Use hardcoded token, then localStorage, then prompt once
-  const token = (HARDCODED_TOKEN && HARDCODED_TOKEN !== 'PASTE_YOUR_TOKEN_HERE')
-    ? HARDCODED_TOKEN
-    : (localStorage.getItem('mon_token') || '');
-  if (!token) {
-    const t = prompt('Enter your monday API token to connect:\n\nAvatar (top right) → Developers → API v2 Token → Copy');
-    if (!t) throw new Error('No API token — enter your token to connect.');
-    localStorage.setItem('mon_token', t.trim());
-    return mondayQuery(query);
-  }
+  const token = getToken();
+  if (!token) { showTokenScreen(); throw new Error('token_needed'); }
   const res = await fetch('https://api.monday.com/v2', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': token.trim(), 'API-Version': '2024-01' },
+    headers: { 'Content-Type': 'application/json', 'Authorization': token, 'API-Version': '2024-01' },
     body: JSON.stringify({ query })
   });
-  if (!res.ok) {
-    // Token might be wrong — clear it and retry
-    localStorage.removeItem('mon_token');
-    throw new Error(`API error ${res.status} — check your token is correct.`);
-  }
   const json = await res.json();
-  if (json.errors) throw new Error(json.errors[0].message);
+  if (json.errors) {
+    if (json.errors[0].message.includes('auth') || json.errors[0].message.includes('token')) {
+      clearToken(); showTokenScreen();
+    }
+    throw new Error(json.errors[0].message);
+  }
   return json.data;
+}
+
+function showTokenScreen() {
+  document.getElementById('token-screen').style.display = 'flex';
+  document.getElementById('orders-grid').innerHTML = '';
+}
+
+function connectToken() {
+  const t = document.getElementById('token-field').value.trim();
+  if (!t) return;
+  saveToken(t);
+  document.getElementById('token-screen').style.display = 'none';
+  loadOrders();
 }
 
 async function loadOrders() {
   const grid = document.getElementById('orders-grid');
   grid.innerHTML = `<div class="loading-state"><div class="spinner"></div><p style="font-size:14px;color:var(--grey-400);">Loading orders…</p></div>`;
   try {
-    // Simplified query — avoid typed fragments which can cause schema errors
     const data = await mondayQuery(`query{boards(ids:[${BOARD_ID}]){items_page(limit:200){items{id name column_values{id text value}}}}}`);
     allOrders = (data?.boards?.[0]?.items_page?.items || []).map(parseItem);
     applyFilters();
   } catch(e) {
-    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Could not load orders</div><p class="empty-sub">${e.message}</p></div>`;
+    if (e.message === 'token_needed') return; // token screen is showing
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Could not load orders</div><p class="empty-sub">${e.message}</p><button class="btn-new" style="margin:12px auto 0;display:inline-flex;" onclick="clearToken();showTokenScreen();">Re-enter Token</button></div>`;
   }
 }
 
@@ -903,6 +939,7 @@ function setProductStatus(val) {
     if(opt.dataset.val===productStatusVal) opt.classList.add(productStatusVal==='Received'?'active-done':productStatusVal==='In Transit'?'active-ready':'active-pending');
   });
 }
+function selectArrivalStatus(el) {
   document.getElementById('f-arrival-status-group').querySelectorAll('.status-option').forEach(o=>{o.className=o.className.replace(/active-\w+/g,'').trim();});
   el.classList.add(el.dataset.val==='Confirmed'?'active-done':'active-pending');
   arrivalStatusVal=el.dataset.val;
@@ -986,8 +1023,6 @@ function showToast(msg,type='success') {
 }
 
 // ─── HASH-BASED TAB ROUTING ───────────────────────────────
-// Uses URL hash (#orders, #calendar etc) — works in all iFrame contexts
-// because hash changes are native browser navigation, not JS events
 function switchTab(tab) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'tab-' + tab));
@@ -1004,7 +1039,13 @@ window.addEventListener('hashchange', handleHash);
 window.addEventListener('load', handleHash);
 
 // ─── STARTUP ─────────────────────────────────────────────
-initMonday().then(() => loadOrders());
+initMonday().then(() => {
+  if (!getToken() && !mondayClient) {
+    showTokenScreen();
+  } else {
+    loadOrders();
+  }
+});
 </script>
 </body>
 </html>
