@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incoming Orders Hub</title>
+<script src="https://cdn.monday.com/apps/monday-sdk-js/lib/monday-sdk-js.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --teal: #00B4C8;
+    --teal-dark: #0093A8;
+    --teal-light: #E6F8FB;
+    --navy: #0D2137;
+    --navy-mid: #1A3550;
+    --white: #FFFFFF;
+    --grey-50: #F7F9FA;
+    --grey-100: #EEF1F4;
+    --grey-200: #D8DDE3;
+    --grey-400: #8B97A5;
+    --grey-700: #3D4D5C;
+    --text: #1A2B3C;
+    --border: #DDE3EA;
+    --status-pending: #F5A623;
+    --status-pending-bg: #FEF6E8;
+    --status-ready: #00B4C8;
+    --status-ready-bg: #E6F8FB;
+    --status-done: #27AE60;
+    --status-done-bg: #E8F8EE;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.05);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.05);
+    --radius: 12px; --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--grey-50); color: var(--text); min-height: 100vh; }
+
+  .header { background: var(--navy); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 56px; position: sticky; top: 0; z-index: 100; gap: 16px; }
+  .header-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .header-logo { width: 28px; height: 28px; background: var(--teal); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .header-title { font-size: 15px; font-weight: 600; color: var(--white); letter-spacing: -0.01em; }
+  .header-title span { color: var(--teal); }
+  .monday-link { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 6px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); font-size: 12px; font-weight: 500; text-decoration: none; white-space: nowrap; transition: all 0.15s; }
+  .monday-link:hover { background: rgba(255,255,255,0.14); color: var(--white); }
+
+  .nav-tabs { background: var(--navy-mid); padding: 0 24px; display: flex; align-items: flex-end; gap: 2px; border-bottom: 2px solid rgba(255,255,255,0.08); height: 44px; }
+  .nav-tab { display: flex; align-items: center; gap: 6px; padding: 0 16px; height: 44px; font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.55); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; white-space: nowrap; user-select: none; }
+  .nav-tab:hover { color: rgba(255,255,255,0.85); }
+  .nav-tab.active { color: var(--white); border-bottom-color: var(--teal); font-weight: 600; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ─── SUPPLIER COLOURS ─── */
+  :root {
+    --s-macron:    #1a56db; --s-macron-bg:    #EBF2FF;
+    --s-lic:       #7e3af2; --s-lic-bg:       #F3ECFF;
+    --s-newera:    #E3272B; --s-newera-bg:    #FEF0F0;
+    --s-nar:       #d97706; --s-nar-bg:       #FFFBEB;
+    --s-kook:      #059669; --s-kook-bg:      #ECFDF5;
+    --s-trofe:     #0891b2; --s-trofe-bg:     #ECFEFF;
+    --s-sport:     #be185d; --s-sport-bg:     #FDF2F8;
+    --s-other:     #6b7280; --s-other-bg:     #F3F4F6;
+    --arr-tentative: #F59E0B; --arr-tentative-bg: #FFFBEB;
+    --arr-confirmed: #10B981; --arr-confirmed-bg: #ECFDF5;
+  }
+
+  .toolbar { padding: 12px 20px; display: flex; align-items: center; gap: 8px; background: var(--white); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .filter-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; }
+  .filter-label { font-size: 12px; font-weight: 500; color: var(--grey-400); white-space: nowrap; }
+  .filter-select { height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text); background: var(--grey-50); cursor: pointer; outline: none; transition: border-color 0.15s; }
+  .filter-select:focus { border-color: var(--teal); }
+  .search-box { height: 34px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text); background: var(--grey-50); outline: none; width: 180px; transition: border-color 0.15s; }
+  .search-box:focus { border-color: var(--teal); }
+  .btn-new { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 18px; background: var(--teal); color: var(--white); border: none; border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s; white-space: nowrap; margin-left: auto; }
+  .btn-new:hover { background: var(--teal-dark); }
+  .order-count { display: flex; align-items: center; gap: 6px; padding: 5px 12px; background: var(--teal-light); border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--teal-dark); flex-shrink: 0; }
+
+  /* ─── ORDERS GRID — full width ─── */
+  .main { padding: 20px; }
+  .orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+
+  /* ─── ORDER CARD ─── */
+  .order-card { background: var(--white); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow-sm); overflow: hidden; transition: box-shadow 0.2s, transform 0.15s; display: flex; flex-direction: column; }
+  .order-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+
+  /* Coloured left accent bar per supplier */
+  .order-card .card-accent { height: 4px; width: 100%; }
+  .accent-macron  { background: var(--s-macron); }
+  .accent-lic     { background: var(--s-lic); }
+  .accent-newera  { background: var(--s-newera); }
+  .accent-nar     { background: var(--s-nar); }
+  .accent-kook    { background: var(--s-kook); }
+  .accent-trofe   { background: var(--s-trofe); }
+  .accent-sport   { background: var(--s-sport); }
+  .accent-other   { background: var(--s-other); }
+
+  .card-header { padding: 14px 16px 10px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .card-title-wrap { flex: 1; min-width: 0; }
+  .card-order-name { font-size: 15px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px; letter-spacing: -0.01em; }
+  .card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+  /* Supplier pills — per-supplier colour */
+  .supplier-pill { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+  .sp-macron  { background: var(--s-macron-bg);  color: var(--s-macron); }
+  .sp-lic     { background: var(--s-lic-bg);     color: var(--s-lic); }
+  .sp-newera  { background: var(--s-newera-bg);  color: var(--s-newera); }
+  .sp-nar     { background: var(--s-nar-bg);     color: var(--s-nar); }
+  .sp-kook    { background: var(--s-kook-bg);    color: var(--s-kook); }
+  .sp-trofe   { background: var(--s-trofe-bg);   color: var(--s-trofe); }
+  .sp-sport   { background: var(--s-sport-bg);   color: var(--s-sport); }
+  .sp-other   { background: var(--s-other-bg);   color: var(--s-other); }
+
+  /* Arrival date badge */
+  .arrival-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .arrival-badge.tentative { background: var(--arr-tentative-bg); color: var(--arr-tentative); }
+  .arrival-badge.confirmed { background: var(--arr-confirmed-bg); color: var(--arr-confirmed); }
+  .arrival-badge.nodate    { background: var(--grey-100); color: var(--grey-400); }
+
+  .card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .btn-icon { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--grey-50); cursor: pointer; font-size: 13px; color: var(--grey-700); transition: all 0.15s; }
+  .btn-icon:hover { background: var(--teal-light); border-color: var(--teal); color: var(--teal-dark); }
+
+  .card-body { padding: 10px 16px 14px; flex: 1; }
+  .card-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--grey-100); }
+  .card-row:last-child { border-bottom: none; }
+  .row-label { font-size: 10px; font-weight: 700; color: var(--grey-400); text-transform: uppercase; letter-spacing: 0.07em; flex-shrink: 0; width: 110px; }
+  .row-value { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: flex-end; min-width: 0; flex-wrap: wrap; }
+
+  /* File pills — available (clickable) vs unavailable (greyed) */
+  .file-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; text-decoration: none; transition: all 0.15s; flex-shrink: 0; }
+  .file-pill.available { background: var(--teal-light); color: var(--teal-dark); border: 1px solid rgba(0,180,200,0.3); cursor: pointer; }
+  .file-pill.available:hover { background: var(--teal); color: var(--white); }
+  .file-pill.unavailable { background: var(--grey-100); color: var(--grey-400); border: 1px solid var(--grey-200); cursor: default; }
+
+  .status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; transition: opacity 0.15s; flex-shrink: 0; }
+  .status-pill.pending { background: var(--status-pending-bg); color: var(--status-pending); border: 1px solid rgba(245,166,35,0.3); }
+  .status-pill.ready   { background: var(--status-ready-bg);   color: var(--status-ready);   border: 1px solid rgba(0,180,200,0.3); }
+  .status-pill.done    { background: var(--status-done-bg);    color: var(--status-done);    border: 1px solid rgba(39,174,96,0.3); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .card-notes { padding: 8px 16px 12px; border-top: 1px solid var(--grey-100); }
+  .notes-text { font-size: 12px; color: var(--grey-700); line-height: 1.5; font-style: italic; }
+
+  /* ─── CALENDAR VIEW ─── */
+  .cal-wrap { padding: 20px; }
+  .cal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .cal-month-label { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; min-width: 180px; }
+  .cal-nav { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--white); cursor: pointer; font-size: 14px; color: var(--grey-700); transition: all 0.15s; }
+  .cal-nav:hover { background: var(--teal-light); border-color: var(--teal); color: var(--teal-dark); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .cal-dow { background: var(--navy); color: rgba(255,255,255,0.7); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; text-align: center; padding: 10px 4px; }
+  .cal-cell { background: var(--white); min-height: 110px; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .cal-cell.other-month { background: var(--grey-50); }
+  .cal-cell.today { background: #F0FAFC; }
+  .cal-date { font-size: 13px; font-weight: 600; color: var(--grey-700); margin-bottom: 2px; }
+  .cal-cell.today .cal-date { background: var(--teal); color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+  .cal-event { padding: 3px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity 0.15s; }
+  .cal-event:hover { opacity: 0.8; }
+  .cal-event.tentative { background: var(--arr-tentative-bg); color: var(--arr-tentative); border-left: 3px solid var(--arr-tentative); }
+  .cal-event.confirmed { background: var(--arr-confirmed-bg); color: var(--arr-confirmed); border-left: 3px solid var(--arr-confirmed); }
+  .cal-legend { display: flex; gap: 16px; margin-bottom: 16px; }
+  .cal-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--grey-700); font-weight: 500; }
+  .cal-legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  .empty-state { grid-column: 1 / -1; text-align: center; padding: 64px 24px; color: var(--grey-400); }
+  .empty-icon { font-size: 48px; margin-bottom: 16px; }
+  .empty-title { font-size: 18px; font-weight: 600; color: var(--grey-700); margin-bottom: 6px; }
+  .empty-sub { font-size: 14px; margin-bottom: 20px; }
+  .loading-state { grid-column: 1 / -1; text-align: center; padding: 64px 24px; }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--grey-200); border-top-color: var(--teal); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 16px; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal { background: var(--white); border-radius: 16px; width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); transform: translateY(16px); transition: transform 0.2s; }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .modal-title { font-size: 17px; font-weight: 700; color: var(--text); }
+  .modal-close { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: none; background: var(--grey-100); font-size: 16px; cursor: pointer; color: var(--grey-700); transition: background 0.15s; }
+  .modal-close:hover { background: var(--grey-200); }
+  .modal-body { padding: 20px 24px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-label { font-size: 12px; font-weight: 600; color: var(--grey-700); text-transform: uppercase; letter-spacing: 0.05em; }
+  .form-input, .form-select, .form-textarea { padding: 9px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text); background: var(--white); outline: none; transition: border-color 0.15s; }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0,180,200,0.1); }
+  .form-textarea { resize: vertical; min-height: 70px; }
+  .form-section-label { font-size: 11px; font-weight: 700; color: var(--teal-dark); text-transform: uppercase; letter-spacing: 0.08em; grid-column: 1 / -1; padding-top: 8px; border-top: 1px solid var(--grey-100); margin-top: 4px; }
+  .status-select-group { display: flex; gap: 6px; }
+  .status-option { flex: 1; padding: 7px 8px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; text-align: center; cursor: pointer; transition: all 0.15s; letter-spacing: 0.02em; }
+  .status-option.pending-opt { color: var(--status-pending); }
+  .status-option.ready-opt   { color: var(--status-ready); }
+  .status-option.done-opt    { color: var(--status-done); }
+  .status-option.active-pending { background: var(--status-pending-bg); border-color: var(--status-pending); }
+  .status-option.active-ready   { background: var(--status-ready-bg);   border-color: var(--status-ready); }
+  .status-option.active-done    { background: var(--status-done-bg);    border-color: var(--status-done); }
+  .modal-footer { padding: 16px 24px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-cancel { height: 38px; padding: 0 16px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--white); font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; color: var(--grey-700); cursor: pointer; transition: all 0.15s; }
+  .btn-cancel:hover { border-color: var(--grey-400); }
+  .btn-save { height: 38px; padding: 0 20px; border: none; border-radius: var(--radius-sm); background: var(--teal); font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; color: var(--white); cursor: pointer; transition: background 0.15s; display: flex; align-items: center; gap: 6px; }
+  .btn-save:hover { background: var(--teal-dark); }
+  .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: var(--white); padding: 12px 18px; border-radius: 10px; font-size: 13px; font-weight: 500; box-shadow: var(--shadow-lg); z-index: 999; transform: translateY(60px); opacity: 0; transition: all 0.25s; display: flex; align-items: center; gap: 8px; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success .toast-icon::before { content: '✓'; color: var(--status-done); }
+  .toast.error   .toast-icon::before { content: '✕'; color: #E74C3C; }
+
+  /* Guide tab styles */
+  .guide-header { background: var(--white); border-bottom: 1px solid var(--border); padding: 20px 24px 0; }
+  .guide-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .guide-title { font-size: 18px; font-weight: 700; color: var(--text); }
+  .guide-sub { font-size: 13px; color: var(--grey-400); }
+  .guide-dl-btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; border-radius: var(--radius-sm); background: var(--navy); color: var(--white); text-decoration: none; font-size: 13px; font-weight: 600; transition: background 0.15s; white-space: nowrap; flex-shrink: 0; }
+  .guide-dl-btn:hover { background: var(--navy-mid); }
+  .guide-content { padding: 24px; max-width: 900px; }
+
+  /* Embedded guide component styles */
+  .g-section-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #9ca3af; font-weight: 600; margin-bottom: 12px; }
+  .g-divider { height: 1px; background: rgba(0,0,0,0.08); margin: 32px 0; }
+  .g-card { background: var(--white); border-radius: 14px; border: 1px solid rgba(0,0,0,0.08); padding: 20px 22px; overflow: hidden; margin-bottom: 4px; }
+  .g-card-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #9ca3af; margin-bottom: 16px; }
+  .g-flow { display: flex; align-items: center; background: var(--white); border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 20px 16px; margin-bottom: 28px; overflow-x: auto; }
+  .g-flow-node { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 88px; }
+  .g-flow-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .gfi-teal { background: #e8f7f9; } .gfi-blue { background: #e0f5fb; } .gfi-amber { background: #FAEEDA; } .gfi-navy { background: #0C2340; } .gfi-green { background: #e8f5ee; }
+  .g-flow-num { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #9ca3af; }
+  .g-flow-lbl { font-size: 12px; font-weight: 600; color: #0C2340; text-align: center; line-height: 1.3; }
+  .g-flow-arr { flex: 1; min-width: 20px; text-align: center; color: #d1d5db; font-size: 20px; padding-bottom: 24px; }
+  .g-band { border-radius: 10px; padding: 13px 16px; margin: 12px 0; display: flex; gap: 10px; align-items: flex-start; }
+  .g-band-teal  { background: #e8f7f9; border-left: 3px solid #7acad6; }
+  .g-band-blue  { background: #e0f5fb; border-left: 3px solid #009DC4; }
+  .g-band-amber { background: #FAEEDA; border-left: 3px solid #e6a817; }
+  .g-band-red   { background: #fdf0f0; border-left: 3px solid #c0392b; }
+  .g-band-green { background: #e8f5ee; border-left: 3px solid #1e7e4a; }
+  .g-band-ico { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+  .g-band-body { flex: 1; }
+  .g-band-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .g-band-teal .g-band-title { color: #1a6a78; } .g-band-blue .g-band-title { color: #005068; } .g-band-amber .g-band-title { color: #854F0B; } .g-band-red .g-band-title { color: #c0392b; }
+  .g-band-text { font-size: 13px; line-height: 1.6; }
+  .g-band-teal .g-band-text { color: #3a9aaa; } .g-band-blue .g-band-text { color: #007a99; } .g-band-amber .g-band-text { color: #854F0B; } .g-band-red .g-band-text { color: #c0392b; } .g-band-green .g-band-text { color: #1e7e4a; }
+  .g-fixed-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin: 16px 0; }
+  .g-fixed-card { background: #0C2340; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .g-fixed-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.45); }
+  .g-fixed-col { font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #7acad6; font-weight: 600; }
+  .g-fixed-val { font-size: 20px; font-weight: 600; color: #fff; line-height: 1; }
+  .g-fixed-note { font-size: 11px; color: rgba(255,255,255,0.45); line-height: 1.4; margin-top: 2px; }
+  .g-steps { display: flex; flex-direction: column; }
+  .g-step { display: grid; grid-template-columns: 36px 1fr; gap: 0 14px; }
+  .g-step-left { display: flex; flex-direction: column; align-items: center; }
+  .g-step-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+  .gsi-navy { background: #0C2340; } .gsi-teal { background: #e8f7f9; } .gsi-blue { background: #e0f5fb; } .gsi-amber { background: #FAEEDA; }
+  .g-step-line { width: 1px; flex: 1; background: rgba(0,0,0,0.08); margin: 4px 0; min-height: 16px; }
+  .g-step:last-child .g-step-line { display: none; }
+  .g-step-body { padding-bottom: 22px; min-width: 0; width: 100%; }
+  .g-step:last-child .g-step-body { padding-bottom: 0; }
+  .g-step-title { font-size: 14px; font-weight: 600; color: #0C2340; padding-top: 7px; margin-bottom: 5px; }
+  .g-step-desc { font-size: 13px; color: #6b7280; line-height: 1.65; margin-bottom: 8px; }
+  .g-tag { display: inline-block; font-family: 'Courier New', Courier, monospace; font-size: 11px; background: #F5F5F5; border: 1px solid rgba(0,0,0,0.08); border-radius: 4px; padding: 1px 6px; color: #1a1a1a; }
+  .g-path { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  .g-path-sep { color: #9ca3af; font-size: 12px; }
+  .g-pill { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
+  .g-pill-teal  { background: #e8f7f9; color: #1a6a78; } .g-pill-blue  { background: #e0f5fb; color: #005068; }
+  .g-pill-amber { background: #FAEEDA; color: #854F0B; } .g-pill-red   { background: #fdf0f0; color: #c0392b; }
+  .g-check-list { display: flex; flex-direction: column; gap: 9px; margin-top: 8px; }
+  .g-check-item { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: #1a1a1a; line-height: 1.5; }
+  .g-check-ico { font-size: 14px; flex-shrink: 0; }
+  .g-checks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .g-check-tile { background: #F5F5F5; border-radius: 10px; border: 1px solid rgba(0,0,0,0.08); padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; }
+  .g-check-tile-ico { font-size: 18px; flex-shrink: 0; }
+  .g-check-tile-text { font-size: 13px; color: #6b7280; line-height: 1.5; }
+  .g-check-tile-text strong { color: #1a1a1a; display: block; margin-bottom: 2px; font-size: 13px; }
+  .g-etable-wrap { overflow-x: auto; margin: 14px -22px 14px -22px; border-top: 1px solid rgba(0,0,0,0.08); border-bottom: 1px solid rgba(0,0,0,0.08); }
+  .g-etable { border-collapse: collapse; font-size: 11.5px; background: #fff; white-space: nowrap; width: max-content; min-width: 100%; }
+  .g-etable thead th { background: #0C2340; color: rgba(255,255,255,0.7); font-family: 'Courier New', Courier, monospace; font-size: 10px; font-weight: 600; padding: 8px 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .g-etable tbody tr { border-bottom: 1px solid rgba(0,0,0,0.08); }
+  .g-etable td { padding: 8px 10px; font-family: 'Courier New', Courier, monospace; font-size: 11px; color: #6b7280; }
+  .g-etable td.hl { color: #1a6a78; font-weight: 700; }
+  .g-data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .g-data-table th { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #9ca3af; text-align: left; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.08); }
+  .g-data-table td { padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.08); vertical-align: top; color: #1a1a1a; line-height: 1.45; }
+  .g-data-table tr:last-child td { border-bottom: none; }
+  .g-data-table td.mono { font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #1a6a78; font-weight: 600; white-space: nowrap; padding-right: 12px; }
+  .g-data-table td.ex { color: #6b7280; font-size: 12px; font-family: 'Courier New', Courier, monospace; }
+  .g-tr-grid { display: flex; flex-direction: column; gap: 10px; }
+  .g-tr-item { border: 1px solid rgba(0,0,0,0.08); border-radius: 10px; background: #fff; overflow: hidden; }
+  .g-tr-q { padding: 12px 16px; font-size: 13px; font-weight: 600; color: #0C2340; display: flex; gap: 10px; align-items: flex-start; border-bottom: 1px solid rgba(0,0,0,0.08); background: #F5F5F5; }
+  .g-tr-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+  .g-tr-a { padding: 11px 16px 12px; font-size: 13px; color: #6b7280; line-height: 1.65; }
+  .g-source-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0; }
+  .g-source-card { border-radius: 14px; border: 1px solid rgba(0,0,0,0.08); padding: 16px 18px; background: #fff; }
+  .g-source-card-preferred { border-color: #7acad6; background: #e8f7f9; }
+  .g-source-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .g-source-icon { font-size: 22px; }
+  .g-source-title { font-size: 14px; font-weight: 700; color: #0C2340; }
+  .g-source-badge { margin-left: auto; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; background: #7acad6; color: #fff; white-space: nowrap; }
+  .g-source-desc { font-size: 13px; color: #6b7280; line-height: 1.6; margin-bottom: 10px; }
+  .g-source-card-preferred .g-source-desc { color: #1a6a78; }
+  .g-source-pros { display: flex; flex-direction: column; gap: 5px; }
+  .g-source-pro { display: flex; gap: 7px; font-size: 12px; color: #6b7280; align-items: flex-start; }
+  .g-source-card-preferred .g-source-pro { color: #1a6a78; }
+  .g-pro-dot { width: 5px; height: 5px; border-radius: 50%; background: #7acad6; flex-shrink: 0; margin-top: 5px; }
+  .g-source-card-preferred .g-pro-dot { background: #1a6a78; }
+  .g-con-dot { width: 5px; height: 5px; border-radius: 50%; background: #c0392b; flex-shrink: 0; margin-top: 5px; }
+  .g-contact-row { background: #F5F5F5; border: 1px solid rgba(0,0,0,0.08); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+  .g-contact-avatar { width: 36px; height: 36px; border-radius: 50%; background: #0C2340; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .g-contact-name { font-size: 13px; font-weight: 600; color: #0C2340; }
+  .g-contact-email { font-size: 13px; color: #009DC4; text-decoration: none; font-family: 'Courier New', Courier, monospace; }
+  .g-footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,0.08); font-size: 11px; color: #9ca3af; }
+
+  @media (max-width: 600px) {
+    .orders-grid { grid-template-columns: 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+    .form-group.full { grid-column: 1; }
+    .form-section-label { grid-column: 1; }
+    .toolbar { padding: 12px 16px; }
+    .main { padding: 16px; }
+    .g-fixed-grid, .g-checks-grid, .g-source-grid { grid-template-columns: 1fr; }
+    .guide-title-row { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-brand">
+    <div class="header-logo">📦</div>
+    <div class="header-title">Port Store · <span>Incoming Orders</span></div>
+  </div>
+  <a href="https://pafc-team.monday.com/boards/18413119094" target="_blank" class="monday-link">☰ monday board ↗</a>
+</div>
+
+<div class="nav-tabs">
+  <div class="nav-tab active" data-tab="orders" onclick="switchTab('orders')"><span>📦</span> Orders</div>
+  <div class="nav-tab" data-tab="calendar" onclick="switchTab('calendar')"><span>📅</span> Calendar</div>
+  <div class="nav-tab" data-tab="lightspeed" onclick="switchTab('lightspeed')"><span>🖥️</span> Lightspeed Upload</div>
+  <div class="nav-tab" data-tab="awds" onclick="switchTab('awds')"><span>📤</span> AWDS Upload</div>
+</div>
+
+<!-- ══ ORDERS ══ -->
+<div class="view active" id="tab-orders">
+  <div class="toolbar">
+    <div class="filter-group">
+      <span class="filter-label">Filter:</span>
+      <select class="filter-select" id="filter-supplier" onchange="applyFilters()">
+        <option value="">All Suppliers</option>
+        <option>Macron</option><option>Licensing Essentials</option><option>New Era</option>
+        <option>NAR / Mitchell &amp; Ness</option><option>Kookaburra</option>
+        <option>Trofe</option><option>Sporting Souvenirs</option>
+      </select>
+      <select class="filter-select" id="filter-month" onchange="applyFilters()">
+        <option value="">All Months</option>
+        <option value="0">January</option><option value="1">February</option><option value="2">March</option>
+        <option value="3">April</option><option value="4">May</option><option value="5">June</option>
+        <option value="6">July</option><option value="7">August</option><option value="8">September</option>
+        <option value="9">October</option><option value="10">November</option><option value="11">December</option>
+      </select>
+      <select class="filter-select" id="filter-arrival" onchange="applyFilters()">
+        <option value="">All Statuses</option>
+        <option value="Tentative">Tentative</option>
+        <option value="Confirmed">Confirmed</option>
+      </select>
+      <input type="text" class="search-box" id="filter-search" placeholder="Search orders…" oninput="applyFilters()">
+    </div>
+    <div class="order-count"><span id="count-display">0</span> orders</div>
+    <button class="btn-new" onclick="openNewModal()">+ New Order</button>
+  </div>
+  <div class="main">
+    <div class="orders-grid" id="orders-grid">
+      <div class="loading-state"><div class="spinner"></div><p style="font-size:14px;color:var(--grey-400);">Loading orders from monday…</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CALENDAR ══ -->
+<div class="view" id="tab-calendar">
+  <div class="cal-wrap">
+    <div class="cal-header">
+      <button class="cal-nav" onclick="calPrev()">←</button>
+      <div class="cal-month-label" id="cal-month-label">May 2026</div>
+      <button class="cal-nav" onclick="calNext()">→</button>
+    </div>
+    <div class="cal-legend">
+      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:var(--arr-confirmed)"></div> Confirmed</div>
+      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:var(--arr-tentative)"></div> Tentative</div>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+  </div>
+</div>
+<div class="view" id="tab-lightspeed">
+  <div class="guide-header">
+    <div class="guide-title-row">
+      <div><div class="guide-title">Lightspeed Bulk Upload</div><div class="guide-sub">X Series · Process guide</div></div>
+      <a class="guide-dl-btn" href="https://portadelaidefc.sharepoint.com/:x:/r/Consumer%20Business/Processes%20%26%20Guides/Lightspeed%20Upload%20Template.xlsx?d=wde106432a27f4e4d92ff8f55973c4d64&csf=1&web=1&e=3r8XQF" target="_blank">📥 Download Template</a>
+    </div>
+  </div>
+  <div class="guide-content">
+    <div class="g-flow">
+      <div class="g-flow-node"><div class="g-flow-icon gfi-teal">📋</div><div class="g-flow-num">Stage 1</div><div class="g-flow-lbl">Prepare<br>the file</div></div><div class="g-flow-arr">›</div>
+      <div class="g-flow-node"><div class="g-flow-icon gfi-blue">🗂️</div><div class="g-flow-num">Stage 2</div><div class="g-flow-lbl">Check<br>columns</div></div><div class="g-flow-arr">›</div>
+      <div class="g-flow-node"><div class="g-flow-icon gfi-amber">⬆️</div><div class="g-flow-num">Stage 3</div><div class="g-flow-lbl">Run the<br>import</div></div><div class="g-flow-arr">›</div>
+      <div class="g-flow-node"><div class="g-flow-icon gfi-navy" style="font-size:20px;">🔍</div><div class="g-flow-num">Verify</div><div class="g-flow-lbl">Check<br>results</div></div><div class="g-flow-arr">›</div>
+      <div class="g-flow-node"><div class="g-flow-icon gfi-green">✅</div><div class="g-flow-num">Done</div><div class="g-flow-lbl">Products<br>live</div></div>
+    </div>
+
+    <div class="g-section-label">Stage 1</div>
+    <div class="g-card">
+      <div class="g-card-title">Prepare the file</div>
+      <div class="g-steps">
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-navy" style="color:#fff;font-size:18px;">📥</div><div class="g-step-line"></div></div><div class="g-step-body"><div class="g-step-title">Download the template</div><div class="g-step-desc">Always start from the Port Store template. Column names must match exactly — don't rename or add columns.</div><a class="guide-dl-btn" style="margin:8px 0 12px;display:inline-flex;" href="https://portadelaidefc.sharepoint.com/:x:/r/Consumer%20Business/Processes%20%26%20Guides/Lightspeed%20Upload%20Template.xlsx?d=wde106432a27f4e4d92ff8f55973c4d64&csf=1&web=1&e=3r8XQF" target="_blank">📥 &nbsp;Download Lightspeed Upload Template</a></div></div>
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-teal" style="font-size:18px;">📄</div><div class="g-step-line"></div></div><div class="g-step-body"><div class="g-step-title">One row per variant</div><div class="g-step-desc">Each size gets its own row. Product name, category, prices, brand, and supplier repeat on every row — only the SKU, barcode, and size value change per row.</div><div class="g-band g-band-blue"><span class="g-band-ico">ℹ️</span><div class="g-band-body"><div class="g-band-text">Products with no variants (e.g. a can cooler) still get one row — leave <span class="g-tag">variant_option_one_name</span> and <span class="g-tag">variant_option_one_value</span> blank.</div></div></div><div class="g-section-label" style="margin-top:16px;">Example — same product, multiple sizes (only highlighted columns change)</div><div class="g-etable-wrap"><table class="g-etable"><thead><tr><th>sku_code_custom</th><th>sku_code_barcode</th><th>name</th><th>product_category</th><th>variant_option_one_name</th><th>variant_option_one_value</th><th>tags</th><th>supply_price</th><th>retail_price</th></tr></thead><tbody><tr><td class="hl">PAM26SNDR01-S</td><td class="hl">8051552560742</td><td>PA Macron 2026 SDNR Guernsey - Adult</td><td>AFL (MACRON) / Guernseys</td><td>Size</td><td class="hl">S</td><td>2026 Macron Range;2026 SDNR</td><td>67</td><td>135.00</td></tr><tr><td class="hl">PAM26SNDR01-M</td><td class="hl">8051552560759</td><td>PA Macron 2026 SDNR Guernsey - Adult</td><td>AFL (MACRON) / Guernseys</td><td>Size</td><td class="hl">M</td><td>2026 Macron Range;2026 SDNR</td><td>67</td><td>135.00</td></tr><tr><td class="hl">PAM26SNDR01-L</td><td class="hl">8051552560766</td><td>PA Macron 2026 SDNR Guernsey - Adult</td><td>AFL (MACRON) / Guernseys</td><td>Size</td><td class="hl">L</td><td>2026 Macron Range;2026 SDNR</td><td>67</td><td>135.00</td></tr></tbody></table></div></div></div>
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-blue" style="font-size:18px;">💾</div><div class="g-step-line"></div></div><div class="g-step-body"><div class="g-step-title">Save as CSV UTF-8</div><div class="g-step-desc">When done, save using <span class="g-tag">File → Save As → CSV UTF-8 (Comma delimited)</span>.</div><div class="g-band g-band-amber"><span class="g-band-ico">⚠️</span><div class="g-band-body"><div class="g-band-text"><strong>Don't use "CSV (MS-DOS)"</strong> — it breaks special characters on import.</div></div></div></div></div>
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-amber" style="font-size:18px;">✔️</div></div><div class="g-step-body"><div class="g-step-title">Quick checks before you save</div><div class="g-check-list"><div class="g-check-item"><span class="g-check-ico">🔢</span><span>Format barcode column as <strong>Text</strong> — prevents scientific notation like <span class="g-tag">8.05E+12</span></span></div><div class="g-check-item"><span class="g-check-ico">🏷️</span><span>Every row has a unique <span class="g-tag">sku_code_custom</span></span></div><div class="g-check-item"><span class="g-check-ico">💰</span><span>Prices are numbers only — no <span class="g-tag">$</span> symbols</span></div><div class="g-check-item"><span class="g-check-ico">📝</span><span>Product names are <strong>identical</strong> across all rows for the same product</span></div><div class="g-check-item"><span class="g-check-ico">🏷️</span><span>Tags are semicolon-separated with no spaces: <span class="g-tag">2026 Macron Range;2026 SDNR</span></span></div></div></div></div>
+      </div>
+    </div>
+    <div class="g-divider"></div>
+
+    <div class="g-section-label">Stage 2</div>
+    <div class="g-card">
+      <div class="g-card-title">Column reference</div>
+      <div class="g-band g-band-teal" style="margin-bottom:20px;"><span class="g-band-ico">💡</span><div class="g-band-body"><div class="g-band-text">Column headers are <strong>case-sensitive</strong>. Don't rename them — copy directly from the template.</div></div></div>
+      <div class="g-section-label">These three columns are always the same — pre-filled in the template</div>
+      <div class="g-fixed-grid"><div class="g-fixed-card"><div class="g-fixed-label">Column</div><div class="g-fixed-col">tax_name</div><div class="g-fixed-val">Default Tax</div><div class="g-fixed-note">Always. Unless GST-exempt.</div></div><div class="g-fixed-card"><div class="g-fixed-label">Column</div><div class="g-fixed-col">active</div><div class="g-fixed-val">1</div><div class="g-fixed-note">Always 1 for new products.</div></div><div class="g-fixed-card"><div class="g-fixed-label">Column</div><div class="g-fixed-col">track_inventory</div><div class="g-fixed-val">1</div><div class="g-fixed-note">Always 1 for physical products.</div></div></div>
+      <div class="g-section-label" style="margin-top:20px;">Remaining columns — fill these in per product</div>
+      <table class="g-data-table"><thead><tr><th style="width:190px;">Column</th><th style="width:110px;">Required?</th><th>Notes</th><th style="width:175px;">Example</th></tr></thead><tbody>
+        <tr><td class="mono">sku_code_custom</td><td><span class="g-pill g-pill-red">Required</span></td><td>Your internal SKU. Unique per variant. No spaces.</td><td class="ex">PAM26SNDR01-M</td></tr>
+        <tr><td class="mono">sku_code_barcode</td><td><span class="g-pill g-pill-amber">Optional</span></td><td>EAN-13 barcode. Format as <strong>Text</strong> in Excel. Leave blank if not yet available — see Stage 4.</td><td class="ex">8051552560759</td></tr>
+        <tr><td class="mono">name</td><td><span class="g-pill g-pill-red">Required</span></td><td>Full product name. Must be <strong>identical</strong> across all variant rows.</td><td class="ex">PA Macron 2026 SDNR Guernsey - Adult</td></tr>
+        <tr><td class="mono">product_category</td><td><span class="g-pill g-pill-red">Required</span></td><td>Must match an existing category in Lightspeed exactly (case-sensitive).</td><td class="ex">AFL (MACRON) / Guernseys</td></tr>
+        <tr><td class="mono">variant_option_one_name</td><td><span class="g-pill g-pill-amber">If sized</span></td><td>Use <span class="g-tag">Size</span> for apparel. Leave blank for non-sized products.</td><td class="ex">Size</td></tr>
+        <tr><td class="mono">variant_option_one_value</td><td><span class="g-pill g-pill-amber">If sized</span></td><td>The size for this row. One value per row.</td><td class="ex">M</td></tr>
+        <tr><td class="mono">tags</td><td><span class="g-pill g-pill-teal">Optional</span></td><td>Semicolon-separated, no spaces. Add a range tag for easy barcode exports later.</td><td class="ex">2026 Macron Range;2026 SDNR</td></tr>
+        <tr><td class="mono">supply_price</td><td><span class="g-pill g-pill-red">Required</span></td><td>Ex-GST cost price. Numbers only.</td><td class="ex">67</td></tr>
+        <tr><td class="mono">retail_price</td><td><span class="g-pill g-pill-red">Required</span></td><td>Incl. GST sell price. Numbers only.</td><td class="ex">135.00</td></tr>
+        <tr><td class="mono">brand_name</td><td><span class="g-pill g-pill-teal">Optional</span></td><td>Used for filtering in Back Office.</td><td class="ex">MACRON TECHNICAL SPORTSWEAR</td></tr>
+        <tr><td class="mono">supplier_name</td><td><span class="g-pill g-pill-amber">If using POs</span></td><td>Must match an existing supplier in Lightspeed exactly.</td><td class="ex">MACRON TECHNICAL SPORTSWEAR</td></tr>
+        <tr><td class="mono">supplier_code</td><td><span class="g-pill g-pill-teal">Optional</span></td><td>Supplier's own product code. Used for PO line matching.</td><td class="ex">700222890001</td></tr>
+      </tbody></table>
+    </div>
+    <div class="g-divider"></div>
+
+    <div class="g-section-label">Stage 3</div>
+    <div class="g-card">
+      <div class="g-card-title">Run the import</div>
+      <div class="g-band g-band-amber" style="margin-bottom:20px;"><span class="g-band-ico">⚠️</span><div class="g-band-body"><div class="g-band-text"><strong>Test first.</strong> Run a small file of 5–10 products before your full upload.</div></div></div>
+      <div class="g-steps">
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-teal" style="font-size:18px;">🖥️</div><div class="g-step-line"></div></div><div class="g-step-body"><div class="g-step-title">Navigate to the import tool</div><div class="g-path"><span class="g-tag">Products</span><span class="g-path-sep">›</span><span class="g-tag">Import / Export</span><span class="g-path-sep">›</span><span class="g-tag">Import Products</span></div></div></div>
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-blue" style="font-size:18px;">☑️</div><div class="g-step-line"></div></div><div class="g-step-body"><div class="g-step-title">Select import type</div><div class="g-step-desc">Choose <strong>Add new products</strong> for a new range. Only use <strong>Update existing products</strong> if changing fields on products already in Lightspeed.</div><div class="g-band g-band-red"><span class="g-band-ico">🚫</span><div class="g-band-body"><div class="g-band-text"><strong>Don't use "Update existing"</strong> for a new range — rows with no existing match are silently skipped.</div></div></div></div></div>
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-teal" style="font-size:18px;">📤</div><div class="g-step-line"></div></div><div class="g-step-body"><div class="g-step-title">Upload CSV and confirm mapping</div><div class="g-step-desc">Click <strong>Choose File</strong>, select your CSV, then <strong>Next</strong>. Review every field and manually assign anything showing "Not mapped".</div><div class="g-band g-band-teal"><span class="g-band-ico">💡</span><div class="g-band-body"><div class="g-band-text">Screenshot your mapping before confirming — useful if you import the same product type regularly.</div></div></div></div></div>
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-navy" style="font-size:18px;color:#fff;">▶️</div></div><div class="g-step-body"><div class="g-step-title">Run the import</div><div class="g-step-desc">Click <strong>Import</strong> and don't navigate away. When complete, check the skipped count — any skips above zero need investigating.</div></div></div>
+      </div>
+      <div style="margin-top:22px;padding-top:18px;border-top:1px solid rgba(0,0,0,0.08);">
+        <div class="g-section-label">After the import — quick checks</div>
+        <div class="g-checks-grid"><div class="g-check-tile"><div class="g-check-tile-ico">🔍</div><div class="g-check-tile-text"><strong>Spot check products</strong>Search 2–3 products and confirm name, SKU, price, and category are correct.</div></div><div class="g-check-tile"><div class="g-check-tile-ico">📐</div><div class="g-check-tile-text"><strong>Check variants</strong>Open one sized product and confirm all sizes are present.</div></div><div class="g-check-tile"><div class="g-check-tile-ico">📱</div><div class="g-check-tile-text"><strong>POS scan test</strong>Scan a barcode at the terminal — correct product and price should appear.</div></div><div class="g-check-tile"><div class="g-check-tile-ico">💾</div><div class="g-check-tile-text"><strong>Save the import file</strong>Archive your CSV: <span class="g-tag">YYYYMMDD_RangeName_import.csv</span></div></div></div>
+      </div>
+    </div>
+    <div class="g-divider"></div>
+
+    <div class="g-section-label">Stage 4</div>
+    <div class="g-card">
+      <div class="g-card-title">Adding barcodes after the initial upload</div>
+      <div class="g-band g-band-blue" style="margin-bottom:20px;"><span class="g-band-ico">ℹ️</span><div class="g-band-body"><div class="g-band-text">If barcodes weren't available at upload time, add them later using a tag-filtered export and re-import.</div></div></div>
+      <div class="g-steps">
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-teal" style="font-size:18px;">🏷️</div><div class="g-step-line"></div></div><div class="g-step-body"><div class="g-step-title">Filter by tag in Back Office</div><div class="g-step-desc">Go to <span class="g-tag">Products</span> and filter by the range tag you added during the initial upload (e.g. <span class="g-tag">2026 Macron Range</span>).</div></div></div>
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-blue" style="font-size:18px;">📤</div><div class="g-step-line"></div></div><div class="g-step-body"><div class="g-step-title">Export the filtered product list</div><div class="g-step-desc">With the tag filter active, go to <span class="g-tag">Import / Export</span> and export. This gives you a CSV of only those products with all existing fields populated.</div><div class="g-band g-band-teal"><span class="g-band-ico">💡</span><div class="g-band-body"><div class="g-band-text">Use <span class="g-tag">sku_code_custom</span> and <span class="g-tag">name</span> to match your barcode data against the right products.</div></div></div></div></div>
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-amber" style="font-size:18px;">✏️</div><div class="g-step-line"></div></div><div class="g-step-body"><div class="g-step-title">Add barcodes to the exported CSV</div><div class="g-step-desc">Fill in the <span class="g-tag">sku_code_barcode</span> column. Format as <strong>Text</strong> before entering values.</div><div class="g-band g-band-amber"><span class="g-band-ico">⚠️</span><div class="g-band-body"><div class="g-band-text">Only edit the <span class="g-tag">sku_code_barcode</span> column. Changing other fields will overwrite existing data.</div></div></div><div class="g-check-list" style="margin-top:12px;"><div class="g-check-item"><span class="g-check-ico">🔢</span><span>Column formatted as <strong>Text</strong> before entering values</span></div><div class="g-check-item"><span class="g-check-ico">🔢</span><span>All barcodes are 13 digits (EAN-13)</span></div><div class="g-check-item"><span class="g-check-ico">🔢</span><span>No duplicate barcodes in the file</span></div><div class="g-check-item"><span class="g-check-ico">💾</span><span>Save as <span class="g-tag">CSV UTF-8</span> before re-importing</span></div></div></div></div>
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-navy" style="font-size:18px;color:#fff;">▶️</div><div class="g-step-line"></div></div><div class="g-step-body"><div class="g-step-title">Re-import using "Update existing products"</div><div class="g-step-desc">Go to <span class="g-tag">Products → Import / Export → Import Products</span> and select <strong>Update existing products</strong>. Lightspeed matches rows by <span class="g-tag">sku_code_custom</span>.</div><div class="g-band g-band-teal"><span class="g-band-ico">💡</span><div class="g-band-body"><div class="g-band-text">This is the correct time to use <strong>Update existing products</strong> — the products already exist and you're only filling in barcode data.</div></div></div></div></div>
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-teal" style="font-size:18px;">📱</div></div><div class="g-step-body"><div class="g-step-title">Verify with a POS scan test</div><div class="g-step-desc">Scan one of the newly added barcodes at the POS terminal to confirm it pulls up the correct product and price.</div></div></div>
+      </div>
+    </div>
+    <div class="g-divider"></div>
+
+    <div class="g-section-label">Troubleshooting</div>
+    <div class="g-tr-grid">
+      <div class="g-tr-item"><div class="g-tr-q"><span class="g-tr-icon">⚠️</span> Rows are being skipped with no error</div><div class="g-tr-a">Usually a column mapping issue or wrong import type. Check headers match the template exactly, and confirm you chose <strong>Add new products</strong>.</div></div>
+      <div class="g-tr-item"><div class="g-tr-q"><span class="g-tr-icon">🔢</span> Barcodes show as scientific notation (8.05E+12)</div><div class="g-tr-a">The barcode column is formatted as a number. Select the column, format as <strong>Text</strong>, re-paste the barcodes as values, then re-export the CSV.</div></div>
+      <div class="g-tr-item"><div class="g-tr-q"><span class="g-tr-icon">📄</span> Duplicate products instead of variants grouped together</div><div class="g-tr-a">A variant row has a slightly different product name — even a trailing space causes Lightspeed to create a new product. Use Excel find-replace to standardise the name.</div></div>
+      <div class="g-tr-item"><div class="g-tr-q"><span class="g-tr-icon">🗂️</span> Category not found / product has no category</div><div class="g-tr-a">The category name doesn't exactly match Lightspeed. Pull the exact name from <span class="g-tag">Products → Categories</span> in Back Office.</div></div>
+      <div class="g-tr-item"><div class="g-tr-q"><span class="g-tr-icon">💰</span> Prices show as $0.00 after import</div><div class="g-tr-a">Price columns contain a <span class="g-tag">$</span> symbol or comma separator. Remove with Excel find-replace, re-export, then re-import using <strong>Update existing products</strong>.</div></div>
+      <div class="g-tr-item"><div class="g-tr-q"><span class="g-tr-icon">🏢</span> Supplier error on import</div><div class="g-tr-a">The supplier must already exist in Lightspeed. Go to <span class="g-tag">Inventory → Suppliers</span> and add it first. Supplier names are case-sensitive.</div></div>
+    </div>
+    <div class="g-footer">Port Adelaide FC · Retail Ops · Internal Use Only &nbsp;·&nbsp; Lightspeed X · Bulk Upload Process</div>
+  </div>
+</div>
+
+<!-- ══ AWDS ══ -->
+<div class="view" id="tab-awds">
+  <div class="guide-header">
+    <div class="guide-title-row">
+      <div><div class="guide-title">AWDS Bulk Product Import</div><div class="guide-sub">Warehouse System · Process guide</div></div>
+      <a class="guide-dl-btn" href="https://portadelaidefc.sharepoint.com/:x:/r/Consumer%20Business/Processes%20%26%20Guides/AWDS%20Product%20Template.csv?d=w1c8e8290cc324beabcc7717fa0f43b29&csf=1&web=1&e=tydLjF" target="_blank">📥 Download Template</a>
+    </div>
+  </div>
+  <div class="guide-content">
+    <div class="g-flow">
+      <div class="g-flow-node"><div class="g-flow-icon gfi-teal">📊</div><div class="g-flow-num">Stage 1</div><div class="g-flow-lbl">Get your<br>data</div></div><div class="g-flow-arr">›</div>
+      <div class="g-flow-node"><div class="g-flow-icon gfi-blue">📋</div><div class="g-flow-num">Stage 2</div><div class="g-flow-lbl">Prepare<br>the file</div></div><div class="g-flow-arr">›</div>
+      <div class="g-flow-node"><div class="g-flow-icon gfi-navy" style="font-size:20px;">✉️</div><div class="g-flow-num">Stage 3</div><div class="g-flow-lbl">Send to<br>AWDS</div></div><div class="g-flow-arr">›</div>
+      <div class="g-flow-node"><div class="g-flow-icon gfi-green">✅</div><div class="g-flow-num">Done</div><div class="g-flow-lbl">Products<br>in AWDS</div></div>
+    </div>
+
+    <div class="g-section-label">Stage 1</div>
+    <div class="g-card">
+      <div class="g-card-title">Get your data</div>
+      <div class="g-step-desc" style="margin-bottom:16px;">There are two ways to source product data for an AWDS import. Which one you use depends on whether you're working from a new range upload or from products already in Lightspeed.</div>
+      <div class="g-source-grid">
+        <div class="g-source-card g-source-card-preferred"><div class="g-source-header"><div class="g-source-icon">📊</div><div class="g-source-title">From the product spreadsheet</div><div class="g-source-badge">Recommended</div></div><div class="g-source-desc">Use the pre-built product upload spreadsheet for the range. This already has SKUs, descriptions, categories, and barcodes in one place.</div><div class="g-source-pros"><div class="g-source-pro"><div class="g-pro-dot"></div><span>Barcodes are already present</span></div><div class="g-source-pro"><div class="g-pro-dot"></div><span>Data is clean and consistently formatted</span></div><div class="g-source-pro"><div class="g-pro-dot"></div><span>Much faster for large ranges</span></div></div></div>
+        <div class="g-source-card"><div class="g-source-header"><div class="g-source-icon">🖥️</div><div class="g-source-title">From a Lightspeed export</div></div><div class="g-source-desc">Export products from Lightspeed Back Office. Only use this when you don't have the original upload spreadsheet.</div><div class="g-source-pros"><div class="g-source-pro"><div class="g-pro-dot"></div><span>Useful for products already live in Lightspeed</span></div><div class="g-source-pro"><div class="g-con-dot"></div><span style="color:#c0392b;"><strong>Lightspeed does not export barcodes</strong> — you'll need to source them separately.</span></div></div></div>
+      </div>
+      <div class="g-band g-band-red" style="margin-top:4px;"><span class="g-band-ico">⚠️</span><div class="g-band-body"><div class="g-band-title">Lightspeed barcode limitation</div><div class="g-band-text">Lightspeed's export deliberately omits barcodes. For any range larger than a handful of products, use the product spreadsheet path wherever possible.</div></div></div>
+    </div>
+    <div class="g-divider"></div>
+
+    <div class="g-section-label">Stage 2</div>
+    <div class="g-card">
+      <div class="g-card-title">Prepare the file</div>
+      <div class="g-steps">
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-navy" style="font-size:18px;">📥</div><div class="g-step-line"></div></div><div class="g-step-body"><div class="g-step-title">Download the AWDS template</div><div class="g-step-desc">Always use the Port Store AWDS template. Column names and order must match exactly.</div><a class="guide-dl-btn" style="margin:8px 0 12px;display:inline-flex;" href="https://portadelaidefc.sharepoint.com/:x:/r/Consumer%20Business/Processes%20%26%20Guides/AWDS%20Product%20Template.csv?d=w1c8e8290cc324beabcc7717fa0f43b29&csf=1&web=1&e=tydLjF" target="_blank">📥 &nbsp;Download AWDS Product Template</a></div></div>
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-teal" style="font-size:18px;">📄</div><div class="g-step-line"></div></div><div class="g-step-body"><div class="g-step-title">One row per variant</div><div class="g-step-desc">Each size or colour gets its own row with a unique <span class="g-tag">ProductCode</span> and <span class="g-tag">ItemBarcode</span>. Description and product group repeat across all rows for the same product.</div><div class="g-band g-band-blue"><span class="g-band-ico">ℹ️</span><div class="g-band-body"><div class="g-band-text">The <span class="g-tag">Description</span> must be identical across all variant rows for the same product — never include size in the description.</div></div></div><div class="g-section-label" style="margin-top:16px;">Example — same product, multiple sizes</div><div class="g-etable-wrap"><table class="g-etable"><thead><tr><th>DRCode</th><th>ProductCode</th><th>Description</th><th>ProductGroup</th><th>ItemsPerOuter</th><th>OutersPerPallet</th><th>ItemBarcode</th></tr></thead><tbody><tr><td>3027</td><td class="hl">PAM26SNDR01-S</td><td>PA Macron 2026 SDNR Guernsey - Adult</td><td>MERCH</td><td>100</td><td>100</td><td class="hl">8051552560742</td></tr><tr><td>3027</td><td class="hl">PAM26SNDR01-M</td><td>PA Macron 2026 SDNR Guernsey - Adult</td><td>MERCH</td><td>100</td><td>100</td><td class="hl">8051552560759</td></tr><tr><td>3027</td><td class="hl">PAM26SNDR01-L</td><td>PA Macron 2026 SDNR Guernsey - Adult</td><td>MERCH</td><td>100</td><td>100</td><td class="hl">8051552560766</td></tr></tbody></table></div></div></div>
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-blue" style="font-size:18px;">💾</div><div class="g-step-line"></div></div><div class="g-step-body"><div class="g-step-title">Save as CSV UTF-8</div><div class="g-step-desc">Save using <span class="g-tag">File → Save As → CSV UTF-8 (Comma delimited)</span>.</div><div class="g-band g-band-amber"><span class="g-band-ico">⚠️</span><div class="g-band-body"><div class="g-band-text"><strong>Don't use "CSV (MS-DOS)"</strong> — it breaks special characters.</div></div></div></div></div>
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-amber" style="font-size:18px;">✔️</div></div><div class="g-step-body"><div class="g-step-title">Quick checks before you save</div><div class="g-check-list"><div class="g-check-item"><span class="g-check-ico">🔢</span><span><span class="g-tag">ItemBarcode</span> column formatted as <strong>Text</strong> — prevents scientific notation</span></div><div class="g-check-item"><span class="g-check-ico">🏷️</span><span>Every row has a unique <span class="g-tag">ProductCode</span></span></div><div class="g-check-item"><span class="g-check-ico">📝</span><span><span class="g-tag">Description</span> does <strong>not</strong> include size — identical across all rows for the same product</span></div><div class="g-check-item"><span class="g-check-ico">🔒</span><span><span class="g-tag">DRCode</span> is <strong>3027</strong> on every row</span></div></div></div></div>
+      </div>
+    </div>
+    <div class="g-divider"></div>
+
+    <div class="g-section-label">Final step</div>
+    <div class="g-card">
+      <div class="g-card-title">Email the file to AWDS</div>
+      <div class="g-step-desc" style="margin-bottom:20px;">Once the CSV is complete and checked, email it directly to the AWDS team. All three contacts should be included on every submission.</div>
+      <div class="g-steps">
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-teal" style="font-size:18px;">💾</div><div class="g-step-line"></div></div><div class="g-step-body"><div class="g-step-title">Save and name the file</div><div class="g-step-desc">Save your completed CSV to the shared drive before sending.</div><div style="margin-top:6px;"><span class="g-tag">YYYYMMDD_RangeName_AWDS_import.csv</span></div></div></div>
+        <div class="g-step"><div class="g-step-left"><div class="g-step-icon gsi-navy" style="font-size:18px;color:#fff;">✉️</div></div><div class="g-step-body"><div class="g-step-title">Email to the AWDS team</div><div class="g-step-desc">Attach the CSV and send to all three contacts below.</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;">
+            <div class="g-contact-row"><div class="g-contact-avatar">SA</div><div><div class="g-contact-name">Steve Anderson</div><a href="mailto:sanderson@awds.com.au" class="g-contact-email">sanderson@awds.com.au</a></div></div>
+            <div class="g-contact-row"><div class="g-contact-avatar">PA</div><div><div class="g-contact-name">Phil Aberle</div><a href="mailto:paberle@awds.com.au" class="g-contact-email">paberle@awds.com.au</a></div></div>
+            <div class="g-contact-row"><div class="g-contact-avatar">RC</div><div><div class="g-contact-name">Rebecca Cunningham</div><a href="mailto:rcunningham@awds.com.au" class="g-contact-email">rcunningham@awds.com.au</a></div></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <div class="g-footer">Port Adelaide FC · Retail Ops · Internal Use Only &nbsp;·&nbsp; AWDS · Bulk Product Import Process</div>
+  </div>
+</div>
+
+<!-- ══ MODAL ══ -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOnBackdrop(event)">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="modal-title">New Incoming Order</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label class="form-label">Order Name *</label><input type="text" class="form-input" id="f-name" placeholder="e.g. Macron 2026 On-Field Jersey Drop"></div>
+        <div class="form-group"><label class="form-label">Supplier</label><select class="form-select" id="f-supplier"><option value="">Select supplier…</option><option>Macron</option><option>Licensing Essentials</option><option>New Era</option><option>NAR / Mitchell &amp; Ness</option><option>Kookaburra</option><option>Trofe</option><option>Sporting Souvenirs</option></select></div>
+        <div class="form-group"><label class="form-label">Arrival Date</label><input type="date" class="form-input" id="f-delivery"></div>
+        <div class="form-group full"><label class="form-label">Arrival Status</label><div class="status-select-group" id="f-arrival-status-group"><div class="status-option pending-opt active-pending" data-val="Tentative" onclick="selectArrivalStatus(this)">Tentative</div><div class="status-option done-opt" data-val="Confirmed" onclick="selectArrivalStatus(this)">Confirmed</div></div></div>
+        <div class="form-group full"><label class="form-label">Order Placed — SharePoint Link</label><input type="url" class="form-input" id="f-order-link" placeholder="https://portadelaidefc.sharepoint.com/…"></div>
+        <div class="form-section-label">📥 Lightspeed Product Upload</div>
+        <div class="form-group full"><label class="form-label">Lightspeed File — SharePoint Link</label><input type="url" class="form-input" id="f-ls-link" placeholder="https://portadelaidefc.sharepoint.com/…"></div>
+        <div class="form-group full"><label class="form-label">Lightspeed Status</label><div class="status-select-group" id="f-ls-status-group"><div class="status-option pending-opt active-pending" data-val="To Be Completed" onclick="selectStatus('ls', this)">To Be Completed</div><div class="status-option ready-opt" data-val="File Ready" onclick="selectStatus('ls', this)">File Ready</div><div class="status-option done-opt" data-val="Available in Lightspeed" onclick="selectStatus('ls', this)">Available in Lightspeed</div></div></div>
+        <div class="form-section-label">📤 AWDS Product Upload</div>
+        <div class="form-group full"><label class="form-label">AWDS File — SharePoint Link</label><input type="url" class="form-input" id="f-awds-link" placeholder="https://portadelaidefc.sharepoint.com/…"></div>
+        <div class="form-group full"><label class="form-label">AWDS Status</label><div class="status-select-group" id="f-awds-status-group"><div class="status-option pending-opt active-pending" data-val="To Be Completed" onclick="selectStatus('awds', this)">To Be Completed</div><div class="status-option ready-opt" data-val="File Ready" onclick="selectStatus('awds', this)">File Ready</div><div class="status-option done-opt" data-val="Submitted to AWDS" onclick="selectStatus('awds', this)">Submitted to AWDS</div></div></div>
+        <div class="form-section-label">🖼️ Assets & Information</div>
+        <div class="form-group"><label class="form-label">Imagery — SharePoint Link</label><input type="url" class="form-input" id="f-imagery-link" placeholder="https://portadelaidefc.sharepoint.com/…"></div>
+        <div class="form-group"><label class="form-label">Product Info — SharePoint Link</label><input type="url" class="form-input" id="f-info-link" placeholder="https://portadelaidefc.sharepoint.com/…"></div>
+        <div class="form-group full"><label class="form-label">Notes</label><textarea class="form-textarea" id="f-notes" placeholder="Any additional notes, context, or reminders…"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-save" id="btn-save" onclick="saveOrder()"><span id="save-label">Save Order</span></button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="toast-icon"></span><span id="toast-msg"></span></div>
+
+<script>
+const BOARD_ID = '18413119094';
+const COL = { supplier:'dropdown_mm3b6cg4', delivery:'text_mm3bwgf1', orderLink:'link_mm3bzy9j', lsFile:'link_mm3bzf16', lsStatus:'color_mm3by7z', awdsFile:'link_mm3by0r3', awdsStatus:'color_mm3b2wh8', imagery:'link_mm3b9662', productInfo:'link_mm3bqe76', notes:'long_text_mm3bf7qw' };
+let allOrders = [], editingItemId = null, lsStatusVal = 'To Be Completed', awdsStatusVal = 'To Be Completed', arrivalStatusVal = 'Tentative';
+let calYear = new Date().getFullYear(), calMonth = new Date().getMonth();
+
+const SUPPLIER_MAP = {
+  'Macron':                { cls:'macron', label:'Macron' },
+  'Licensing Essentials':  { cls:'lic',    label:'Lic. Essentials' },
+  'New Era':               { cls:'newera', label:'New Era' },
+  'NAR / Mitchell & Ness': { cls:'nar',    label:'NAR / M&N' },
+  'Kookaburra':            { cls:'kook',   label:'Kookaburra' },
+  'Trofe':                 { cls:'trofe',  label:'Trofe' },
+  'Sporting Souvenirs':    { cls:'sport',  label:'Sporting Souvenirs' },
+};
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+const mondayClient = window.mondaySdk ? window.mondaySdk() : null;
+async function initMonday() {
+  if (!mondayClient) return;
+  try { await mondayClient.get('sessionToken'); } catch(e) {}
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'tab-' + tab));
+  if (tab === 'calendar') renderCalendar();
+}
+
+async function mondayQuery(query) {
+  if (mondayClient) {
+    const res = await mondayClient.api(query);
+    if (res.errors && res.errors.length) throw new Error(res.errors[0].message);
+    return res.data !== undefined ? res.data : res;
+  }
+  throw new Error('monday SDK not available — install this as a monday app.');
+}
+
+async function loadOrders() {
+  const grid = document.getElementById('orders-grid');
+  grid.innerHTML = `<div class="loading-state"><div class="spinner"></div><p style="font-size:14px;color:var(--grey-400);">Loading orders…</p></div>`;
+  try {
+    const data = await mondayQuery(`query{boards(ids:[${BOARD_ID}]){items_page(limit:200){items{id name column_values{id text value ...on LinkValue{url text}...on StatusValue{label index}...on DropdownValue{values{id label}}...on LongTextValue{text}...on TextValue{text}}}}}}`);
+    allOrders = (data?.boards?.[0]?.items_page?.items || []).map(parseItem);
+    applyFilters();
+  } catch(e) {
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Could not load orders</div><p class="empty-sub">${e.message}</p></div>`;
+  }
+}
+
+function extractArrivalStatus(notes) {
+  if ((notes||'').startsWith('[Confirmed]')) return 'Confirmed';
+  return 'Tentative';
+}
+function cleanNotes(notes) { return (notes||'').replace(/^\[(Confirmed|Tentative)\]\s*/, ''); }
+function packNotes(status, notes) { return notes ? `[${status}] ${notes}` : `[${status}]`; }
+function parseDate(str) {
+  if (!str) return null;
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? new Date(+m[1], +m[2]-1, +m[3]) : null;
+}
+
+function parseItem(item) {
+  const cv = {}; for (const c of item.column_values) cv[c.id] = c;
+  const getLink    = id => { const c=cv[id]; return c?{url:c.url||'',label:c.text||''}:{url:'',label:''}; };
+  const getText    = id => cv[id]?.text||'';
+  const getStatus  = id => cv[id]?.label||cv[id]?.text||'';
+  const getDrop    = id => { const v=cv[id]?.values; return v?.length?v[0].label:''; };
+  const rawNotes   = getText(COL.notes);
+  const rawDel     = getText(COL.delivery);
+  return {
+    id:item.id, name:item.name, supplier:getDrop(COL.supplier),
+    delivery:rawDel, deliveryDate:parseDate(rawDel),
+    orderLink:getLink(COL.orderLink), lsFile:getLink(COL.lsFile),
+    lsStatus:getStatus(COL.lsStatus), awdsFile:getLink(COL.awdsFile),
+    awdsStatus:getStatus(COL.awdsStatus), imagery:getLink(COL.imagery),
+    productInfo:getLink(COL.productInfo),
+    arrivalStatus:extractArrivalStatus(rawNotes),
+    cleanNotes:cleanNotes(rawNotes),
+  };
+}
+
+function supplierInfo(name) { return SUPPLIER_MAP[name] || { cls:'other', label:name||'Unknown' }; }
+function statusClass(v) { if(!v||v==='To Be Completed') return 'pending'; if(v==='File Ready') return 'ready'; return 'done'; }
+function filePill(linkObj, label) {
+  return linkObj.url
+    ? `<a href="${linkObj.url}" target="_blank" class="file-pill available">✓ ${label}</a>`
+    : `<span class="file-pill unavailable">✕ ${label}</span>`;
+}
+function formatDate(d) {
+  return d ? d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : null;
+}
+
+function renderOrders(orders) {
+  document.getElementById('count-display').textContent = orders.length;
+  const grid = document.getElementById('orders-grid');
+  if (!orders.length) {
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">No orders found</div><p class="empty-sub">Add your first incoming order or adjust your filters.</p><button class="btn-new" onclick="openNewModal()" style="display:inline-flex;margin:0 auto;">+ New Order</button></div>`;
+    return;
+  }
+  grid.innerHTML = orders.map(o => {
+    const si = supplierInfo(o.supplier);
+    const dateStr = formatDate(o.deliveryDate);
+    const arrCls = o.arrivalStatus==='Confirmed' ? 'confirmed' : o.deliveryDate ? 'tentative' : 'nodate';
+    const arrLabel = dateStr ? `${o.arrivalStatus} · ${dateStr}` : 'No date set';
+    return `<div class="order-card">
+      <div class="card-accent accent-${si.cls}"></div>
+      <div class="card-header">
+        <div class="card-title-wrap">
+          <div class="card-order-name">${o.name}</div>
+          <div class="card-meta">
+            ${o.supplier?`<span class="supplier-pill sp-${si.cls}">${si.label}</span>`:''}
+            <span class="arrival-badge ${arrCls}">📅 ${arrLabel}</span>
+          </div>
+        </div>
+        <div class="card-actions"><button class="btn-icon" onclick="openEditModal('${o.id}')">✎</button></div>
+      </div>
+      <div class="card-body">
+        <div class="card-row"><span class="row-label">Order Placed</span><span class="row-value">${filePill(o.orderLink,'Order')}</span></div>
+        <div class="card-row"><span class="row-label">Lightspeed</span><span class="row-value">${filePill(o.lsFile,'LS File')}<span class="status-pill ${statusClass(o.lsStatus)}"><span class="status-dot"></span>${o.lsStatus||'To Be Completed'}</span></span></div>
+        <div class="card-row"><span class="row-label">AWDS</span><span class="row-value">${filePill(o.awdsFile,'AWDS File')}<span class="status-pill ${statusClass(o.awdsStatus)}"><span class="status-dot"></span>${o.awdsStatus||'To Be Completed'}</span></span></div>
+        <div class="card-row"><span class="row-label">Imagery</span><span class="row-value">${filePill(o.imagery,'Images')}</span></div>
+        <div class="card-row"><span class="row-label">Product Info</span><span class="row-value">${filePill(o.productInfo,'Info')}</span></div>
+      </div>
+      ${o.cleanNotes?`<div class="card-notes"><p class="notes-text">📝 ${o.cleanNotes}</p></div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function applyFilters() {
+  const s = document.getElementById('filter-supplier').value;
+  const mo = document.getElementById('filter-month').value;
+  const arr = document.getElementById('filter-arrival').value;
+  const q = document.getElementById('filter-search').value.toLowerCase();
+  renderOrders(allOrders.filter(o => {
+    if (s && o.supplier !== s) return false;
+    if (mo !== '' && mo !== undefined && mo !== null) {
+      if (!o.deliveryDate || o.deliveryDate.getMonth() !== parseInt(mo)) return false;
+    }
+    if (arr && o.arrivalStatus !== arr) return false;
+    if (q && !o.name.toLowerCase().includes(q)) return false;
+    return true;
+  }));
+}
+
+// ─── CALENDAR ────────────────────────────────────────────
+function renderCalendar() {
+  document.getElementById('cal-month-label').textContent = `${MONTHS[calMonth]} ${calYear}`;
+  const grid = document.getElementById('cal-grid');
+  const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  let html = DAYS.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+
+  let startOff = new Date(calYear,calMonth,1).getDay()-1;
+  if (startOff<0) startOff=6;
+  const dim = new Date(calYear,calMonth+1,0).getDate();
+  const prevDim = new Date(calYear,calMonth,0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  // Build event map
+  const evMap = {};
+  allOrders.forEach(o => {
+    if (!o.deliveryDate) return;
+    const key = `${o.deliveryDate.getFullYear()}-${o.deliveryDate.getMonth()}-${o.deliveryDate.getDate()}`;
+    if (!evMap[key]) evMap[key] = [];
+    evMap[key].push(o);
+  });
+
+  const cells = [];
+  for (let i=startOff-1;i>=0;i--) cells.push({d:prevDim-i,cur:false});
+  for (let d=1;d<=dim;d++) cells.push({d,cur:true});
+  while ((cells.length%7)!==0) cells.push({d:cells.length-dim-startOff+1,cur:false});
+
+  cells.forEach(({d,cur}) => {
+    const isToday = cur && d===today.getDate() && calMonth===today.getMonth() && calYear===today.getFullYear();
+    const events = cur ? (evMap[`${calYear}-${calMonth}-${d}`]||[]) : [];
+    const evHtml = events.map(o => {
+      const cls = o.arrivalStatus==='Confirmed'?'confirmed':'tentative';
+      const si = supplierInfo(o.supplier);
+      return `<div class="cal-event ${cls}" onclick="openEditModal('${o.id}')" title="${o.name}">${o.name}</div>`;
+    }).join('');
+    const dateDisp = isToday ? `<span style="background:var(--teal);color:white;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">${d}</span>` : d;
+    html += `<div class="cal-cell${!cur?' other-month':''}${isToday?' today':''}"><div class="cal-date">${dateDisp}</div>${evHtml}</div>`;
+  });
+  grid.innerHTML = html;
+}
+function calPrev() { calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCalendar(); }
+function calNext() { calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCalendar(); }
+
+// ─── STATUS SELECTORS ─────────────────────────────────────
+function selectStatus(type, el) {
+  const gid = type==='ls'?'f-ls-status-group':'f-awds-status-group';
+  document.getElementById(gid).querySelectorAll('.status-option').forEach(o=>{o.className=o.className.replace(/active-\w+/g,'').trim();});
+  el.classList.add(el.dataset.val==='To Be Completed'?'active-pending':el.dataset.val==='File Ready'?'active-ready':'active-done');
+  if(type==='ls') lsStatusVal=el.dataset.val; else awdsStatusVal=el.dataset.val;
+}
+function selectArrivalStatus(el) {
+  document.getElementById('f-arrival-status-group').querySelectorAll('.status-option').forEach(o=>{o.className=o.className.replace(/active-\w+/g,'').trim();});
+  el.classList.add(el.dataset.val==='Confirmed'?'active-done':'active-pending');
+  arrivalStatusVal=el.dataset.val;
+}
+function resetStatusSelectors() {
+  lsStatusVal='To Be Completed'; awdsStatusVal='To Be Completed'; arrivalStatusVal='Tentative';
+  ['f-ls-status-group','f-awds-status-group'].forEach(gid=>{document.getElementById(gid).querySelectorAll('.status-option').forEach((o,i)=>{o.className=o.className.replace(/active-\w+/g,'').trim();if(i===0)o.classList.add('active-pending');});});
+  const ag=document.getElementById('f-arrival-status-group');
+  if(ag) ag.querySelectorAll('.status-option').forEach((o,i)=>{o.className=o.className.replace(/active-\w+/g,'').trim();if(i===0)o.classList.add('active-pending');});
+}
+function setStatusSelector(type,val) {
+  const gid=type==='ls'?'f-ls-status-group':'f-awds-status-group';
+  document.getElementById(gid).querySelectorAll('.status-option').forEach(opt=>{opt.className=opt.className.replace(/active-\w+/g,'').trim();if(opt.dataset.val===val)opt.classList.add(val==='To Be Completed'?'active-pending':val==='File Ready'?'active-ready':'active-done');});
+  if(type==='ls') lsStatusVal=val; else awdsStatusVal=val;
+}
+function setArrivalStatus(val) {
+  arrivalStatusVal=val||'Tentative';
+  const ag=document.getElementById('f-arrival-status-group');
+  if(ag) ag.querySelectorAll('.status-option').forEach(opt=>{opt.className=opt.className.replace(/active-\w+/g,'').trim();if(opt.dataset.val===arrivalStatusVal)opt.classList.add(arrivalStatusVal==='Confirmed'?'active-done':'active-pending');});
+}
+
+// ─── MODAL ────────────────────────────────────────────────
+function openNewModal() {
+  editingItemId=null; document.getElementById('modal-title').textContent='New Incoming Order'; document.getElementById('save-label').textContent='Save Order';
+  ['f-name','f-supplier','f-delivery','f-order-link','f-ls-link','f-awds-link','f-imagery-link','f-info-link','f-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  resetStatusSelectors(); document.getElementById('modal-overlay').classList.add('open');
+}
+function openEditModal(id) {
+  const o=allOrders.find(x=>x.id===id); if(!o) return;
+  editingItemId=id; document.getElementById('modal-title').textContent='Edit Order'; document.getElementById('save-label').textContent='Update Order';
+  document.getElementById('f-name').value=o.name||'';
+  document.getElementById('f-supplier').value=o.supplier||'';
+  document.getElementById('f-delivery').value=o.deliveryDate?o.deliveryDate.toISOString().split('T')[0]:(o.delivery||'');
+  document.getElementById('f-order-link').value=o.orderLink.url||'';
+  document.getElementById('f-ls-link').value=o.lsFile.url||'';
+  document.getElementById('f-awds-link').value=o.awdsFile.url||'';
+  document.getElementById('f-imagery-link').value=o.imagery.url||'';
+  document.getElementById('f-info-link').value=o.productInfo.url||'';
+  document.getElementById('f-notes').value=o.cleanNotes||'';
+  setStatusSelector('ls',o.lsStatus||'To Be Completed');
+  setStatusSelector('awds',o.awdsStatus||'To Be Completed');
+  setArrivalStatus(o.arrivalStatus||'Tentative');
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+function closeModalOnBackdrop(e) { if(e.target===document.getElementById('modal-overlay')) closeModal(); }
+
+async function saveOrder() {
+  const name=document.getElementById('f-name').value.trim(); if(!name){showToast('Order name is required.','error');return;}
+  const btn=document.getElementById('btn-save'); btn.disabled=true; document.getElementById('save-label').textContent='Saving…';
+  const cv={};
+  const s=document.getElementById('f-supplier').value, d=document.getElementById('f-delivery').value.trim(),
+        ol=document.getElementById('f-order-link').value.trim(), ll=document.getElementById('f-ls-link').value.trim(),
+        al=document.getElementById('f-awds-link').value.trim(), il=document.getElementById('f-imagery-link').value.trim(),
+        pl=document.getElementById('f-info-link').value.trim(), n=document.getElementById('f-notes').value.trim();
+  if(s) cv[COL.supplier]={labels:[s]};
+  if(d) cv[COL.delivery]=d;
+  if(ol) cv[COL.orderLink]={url:ol,text:'View Order'};
+  if(ll) cv[COL.lsFile]={url:ll,text:'Lightspeed File'};
+  if(al) cv[COL.awdsFile]={url:al,text:'AWDS File'};
+  if(il) cv[COL.imagery]={url:il,text:'View Imagery'};
+  if(pl) cv[COL.productInfo]={url:pl,text:'Product Info'};
+  cv[COL.notes]=packNotes(arrivalStatusVal,n);
+  cv[COL.lsStatus]={label:lsStatusVal};
+  cv[COL.awdsStatus]={label:awdsStatusVal};
+  const cvStr=JSON.stringify(cv);
+  try {
+    if(editingItemId){await mondayQuery(`mutation{change_multiple_column_values(board_id:${BOARD_ID},item_id:${editingItemId},column_values:${JSON.stringify(cvStr)},create_labels_if_missing:true){id}}`);showToast('Order updated ✓','success');}
+    else{await mondayQuery(`mutation{create_item(board_id:${BOARD_ID},item_name:${JSON.stringify(name)},column_values:${JSON.stringify(cvStr)},create_labels_if_missing:true){id}}`);showToast('Order saved ✓','success');}
+    closeModal(); await loadOrders();
+  } catch(e){showToast('Error: '+e.message,'error');}
+  finally{btn.disabled=false; document.getElementById('save-label').textContent=editingItemId?'Update Order':'Save Order';}
+}
+
+function showToast(msg,type='success') {
+  const t=document.getElementById('toast'); document.getElementById('toast-msg').textContent=msg; t.className=`toast ${type}`; void t.offsetWidth; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+initMonday().then(()=>loadOrders());
+</script>
+</body>
+</html>
